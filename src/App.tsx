@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 // ユーティリティ（日付・シード・永続化）
 // ============================================================================
 const STORAGE_KEY = "tdoubles_state_v1";
+const PREF_KEY = "tdoubles_prefs_v1"; // 表示系プリファレンス（屋外モードなど）
 
 // ローカルタイムの YYYY-MM-DD を返す（UTCではなく端末ローカル）
 function todayStr() {
@@ -172,17 +173,20 @@ function HelpContent() {
 // メインコンポーネント
 // ============================================================================
 export default function TennisAppPrototype() {
+  // 屋外（高輝度）モード：ONのときは OS ダーク設定に関係なくライト配色に固定
+  const [outdoorMode, setOutdoorMode] = useState(true); // 初期値をON（白背景・高輝度）
   // --- ダークモード（OS 設定に追従） ---------------------------------------
   useEffect(() => {
     if (typeof window === "undefined") return;
     const m = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
-      document.documentElement.classList.toggle("dark", m.matches);
+      const wantDark = !outdoorMode && m.matches; // 屋外モード中は常にライト
+      document.documentElement.classList.toggle("dark", wantDark);
     };
     apply();
     m.addEventListener?.("change", apply);
     return () => m.removeEventListener?.("change", apply);
-  }, []);
+  }, [outdoorMode]);
 
   // --- 状態管理 -------------------------------------------------------------
   const [participants, setParticipants] = useState([
@@ -238,6 +242,18 @@ export default function TennisAppPrototype() {
     }
   }, []);
 
+  // 屋外モードの復元（起動時）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(PREF_KEY);
+      if (raw) {
+        const pref = JSON.parse(raw);
+        if (typeof pref?.outdoorMode === "boolean") setOutdoorMode(pref.outdoorMode);
+      }
+    } catch {}
+  }, []);
+
   // --- 自動保存（常に：同日内の再現のため） --------------------------------
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -253,6 +269,14 @@ export default function TennisAppPrototype() {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {}
   }, [participants, rounds, wPartner, wOpp, wPrev]);
+
+  // 屋外モードの保存
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(PREF_KEY, JSON.stringify({ outdoorMode }));
+    } catch {}
+  }, [outdoorMode]);
 
   // 手動で「今日の状態を消去」→ 新規やり直し（モーダルで確認）
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -659,6 +683,18 @@ export default function TennisAppPrototype() {
       // T17: setEqualIds は要素数が違えば false
       results.push(`[T17] setEqualIds size mismatch: ${setEqualIds([{id:1}], [{id:1},{id:2}]) === false}`);
 
+      // T18: pairingsOfFour の3案は互いに異なる
+      const uniq = new Set(
+        pairingsOfFour(dummy).map((p) =>
+          [
+            key2(p.pairA[0].id, p.pairA[1].id),
+            key2(p.pairB[0].id, p.pairB[1].id),
+          ]
+            .sort()
+            .join("|")
+        )
+      );
+      results.push(`[T18] pairings are unique: ${uniq.size === 3}`);
     } catch (e: any) {
       results.push(`[ERROR] ${e?.message || e}`);
     }
@@ -666,24 +702,29 @@ export default function TennisAppPrototype() {
   }
 
   // ========================================================================
-  // レンダリング（ダークモード対応）
+  // レンダリング（常時ライト配色：屋外視認性重視）
   // ========================================================================
   return (
-    <div className="min-h-screen bg-white text-gray-900 dark:bg-neutral-900 dark:text-gray-100">
+    <div className="min-h-screen bg-white text-gray-900">
       <div className="p-4 max-w-md mx-auto space-y-6">
         {/* 設定カード */}
-        <Card className="border border-neutral-200 dark:border-neutral-700 dark:bg-neutral-800/60">
+        <Card className="border border-neutral-300 bg-white shadow-sm">
           <CardContent className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">設定</h2>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={runSelfTests}>
-                  自己テストを実行
-                </Button>
-                <Button variant="outline" onClick={() => setShowHelp((v) => !v)}>
-                  {showHelp ? "ヘルプを閉じる" : "ヘルプ"}
-                </Button>
-              </div>
+            <h2 className="text-lg font-bold mb-3">設定</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                className={`whitespace-nowrap ${outdoorMode ? "bg-yellow-400 text-black hover:bg-yellow-500 border-yellow-500" : ""}`}
+                onClick={() => setOutdoorMode((v) => !v)}
+              >
+                {outdoorMode ? "屋外モード" : "屋内モード"}
+              </Button>
+              <Button variant="outline" onClick={runSelfTests}>
+                自己テストを実行
+              </Button>
+              <Button variant="outline" onClick={() => setShowHelp((v) => !v)}>
+                {showHelp ? "ヘルプを閉じる" : "ヘルプ"}
+              </Button>
             </div>
 
             {/* 操作 */}
@@ -697,7 +738,7 @@ export default function TennisAppPrototype() {
             </div>
 
             {testResults.length > 0 && (
-              <div className="text-xs bg-gray-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 rounded p-2 space-y-1">
+              <div className="text-xs bg-gray-50 border border-neutral-300 rounded p-2 space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="font-semibold m-0">Self-test results</p>
                   <Button
@@ -717,7 +758,7 @@ export default function TennisAppPrototype() {
             )}
 
             {showHelp && (
-              <div className="mt-2 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white/60 dark:bg-neutral-800/60">
+              <div className="mt-2 p-3 rounded-lg border border-neutral-300 bg-white/90">
                 <HelpContent />
               </div>
             )}
@@ -733,7 +774,7 @@ export default function TennisAppPrototype() {
                   step={1}
                   value={wPartner}
                   onChange={(e) => setWPartner(Number(e.target.value))}
-                  className="flex-1 accent-blue-600 dark:accent-blue-400"
+                  className="flex-1 accent-blue-700"
                 />
                 <span className="w-8 text-right">{wPartner}</span>
               </label>
@@ -746,7 +787,7 @@ export default function TennisAppPrototype() {
                   step={1}
                   value={wOpp}
                   onChange={(e) => setWOpp(Number(e.target.value))}
-                  className="flex-1 accent-blue-600 dark:accent-blue-400"
+                  className="flex-1 accent-blue-700"
                 />
                 <span className="w-8 text-right">{wOpp}</span>
               </label>
@@ -759,7 +800,7 @@ export default function TennisAppPrototype() {
                   step={1}
                   value={wPrev}
                   onChange={(e) => setWPrev(Number(e.target.value))}
-                  className="flex-1 accent-blue-600 dark:accent-blue-400"
+                  className="flex-1 accent-blue-700"
                 />
                 <span className="w-8 text-right">{wPrev}</span>
               </label>
@@ -768,7 +809,7 @@ export default function TennisAppPrototype() {
         </Card>
 
         {/* 参加者選択 */}
-        <Card className="border border-neutral-200 dark:border-neutral-700 dark:bg-neutral-800/60">
+        <Card className="border border-neutral-300 bg-white shadow-sm">
           <CardContent className="p-4">
             <h2 className="text-lg font-bold mb-2">参加者を選択</h2>
             <div className="flex flex-wrap gap-2">
@@ -782,10 +823,16 @@ export default function TennisAppPrototype() {
                   onTouchCancel={() => endLongPress(p.id)}
                   className={`px-3 py-2 rounded-full border text-sm flex items-center gap-1 ${
                     p.away
-                      ? "bg-yellow-300 text-black"
+                      ? (outdoorMode
+                          ? "bg-yellow-400 text-black border-yellow-500"
+                          : "bg-yellow-300 text-black")
                       : p.selected
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 dark:bg-neutral-700"
+                      ? (outdoorMode
+                          ? "bg-sky-600 text-white border-sky-700"
+                          : "bg-blue-500 text-white")
+                      : (outdoorMode
+                          ? "bg-white text-black border-neutral-300 shadow-sm"
+                          : "bg-gray-100 dark:bg-neutral-700")
                   }`}
                 >
                   {displayName(p)}
@@ -796,8 +843,9 @@ export default function TennisAppPrototype() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            <p className="text-xs text-gray-600 mt-2">
               ヒント：タップ=選択/解除・長押し=一時離脱（スマホ）・右クリック=一時離脱（PC）
+              （屋外で見づらい場合は上部の「屋外モード」をONにしてください）
             </p>
             <Button className="mt-4 w-full" onClick={generateRound}>
               次のペアを決める
@@ -807,7 +855,7 @@ export default function TennisAppPrototype() {
 
         {/* ラウンド履歴（最新を上に表示） */}
         {rounds.length > 0 && (
-          <Card className="border border-neutral-200 dark:border-neutral-700 dark:bg-neutral-800/60">
+          <Card className="border border-neutral-300 bg-white shadow-sm">
             <CardContent className="p-4">
               <h2 className="text-lg font-bold mb-2">ラウンド履歴</h2>
               {rounds
@@ -820,20 +868,20 @@ export default function TennisAppPrototype() {
                       key={idx}
                       className={`mb-3 ${
                         isLatest
-                          ? "bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-400 dark:border-blue-500 p-2 rounded"
+                          ? "bg-blue-50 border-l-4 border-blue-500 p-2 rounded"
                           : ""
                       }`}
                     >
                       <p
                         className={`font-semibold ${
-                          isLatest ? "text-lg text-blue-700 dark:text-blue-300" : ""
+                          isLatest ? "text-lg text-blue-800" : ""
                         }`}
                       >
                         第{idx + 1}ラウンド {isLatest && "(最新)"}
                       </p>
                       <p
                         className={`${
-                          isLatest ? "text-xl font-bold text-blue-900 dark:text-blue-200" : ""
+                          isLatest ? "text-xl font-bold text-blue-900" : ""
                         }`}
                       >
                         {r.pairA.map((p: any) => displayName(p)).join("・")} vs {r.pairB
@@ -843,7 +891,7 @@ export default function TennisAppPrototype() {
                       {r.rest.length > 0 && (
                         <p
                           className={`text-sm ${
-                            isLatest ? "text-blue-600 dark:text-blue-300" : "text-gray-600 dark:text-gray-300"
+                            isLatest ? "text-blue-700" : "text-gray-700"
                           }`}
                         >
                           休憩: {r.rest.map((p: any) => displayName(p)).join("・")}
@@ -860,9 +908,9 @@ export default function TennisAppPrototype() {
         {confirmOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmOpen(false)} />
-            <div className="relative z-10 w-[92%] max-w-sm rounded-xl bg-white dark:bg-neutral-800 text-gray-900 dark:text-gray-100 p-4 shadow-xl border border-neutral-200 dark:border-neutral-700">
+            <div className="relative z-10 w-[92%] max-w-sm rounded-xl bg-white text-gray-900 p-4 shadow-xl border border-neutral-300">
               <h3 className="text-base font-semibold mb-2">今日の状態を消去</h3>
-              <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
+              <p className="text-sm text-gray-700 mb-4">
                 本当に今日の状態を消去して新規開始しますか？<br/>
                 ラウンド履歴・選択状態・離脱状態・重み設定が初期化されます。
               </p>
