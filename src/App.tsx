@@ -710,29 +710,33 @@ export default function TennisAppPrototype() {
         {/* 設定カード */}
         <Card className="border border-neutral-300 bg-white shadow-sm">
           <CardContent className="p-4 space-y-3">
-            <h2 className="text-lg font-bold mb-3">設定</h2>
+            <h2 className="text-lg font-bold mb-3 text-black">設定</h2>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
-                className={`whitespace-nowrap ${outdoorMode ? "bg-yellow-400 text-black hover:bg-yellow-500 border-yellow-500" : ""}`}
+                className={`whitespace-nowrap font-medium shadow-sm border ${
+                  outdoorMode
+                    ? "bg-amber-400 text-black border-amber-500 hover:bg-amber-500"
+                    : "bg-white text-black border-neutral-400 hover:bg-neutral-100"
+                }`}
                 onClick={() => setOutdoorMode((v) => !v)}
               >
                 {outdoorMode ? "屋外モード" : "屋内モード"}
               </Button>
-              <Button variant="outline" onClick={runSelfTests}>
+              <Button variant="outline" onClick={runSelfTests} className="font-medium bg-white text-black border border-neutral-400 hover:bg-neutral-100 shadow-sm">
                 自己テストを実行
               </Button>
-              <Button variant="outline" onClick={() => setShowHelp((v) => !v)}>
+              <Button variant="outline" onClick={() => setShowHelp((v) => !v)} className="font-medium bg-white text-black border border-neutral-400 hover:bg-neutral-100 shadow-sm whitespace-nowrap">
                 {showHelp ? "ヘルプを閉じる" : "ヘルプ"}
               </Button>
             </div>
 
             {/* 操作 */}
             <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end text-sm gap-2">
-              <Button type="button" className="w-full sm:w-auto" variant="outline" onClick={resetWeights}>
+              <Button type="button" className="w-full sm:w-auto font-medium bg-white text-black border border-neutral-400 hover:bg-neutral-100 shadow-sm" variant="outline" onClick={resetWeights}>
                 重みをデフォルトに戻す
               </Button>
-              <Button type="button" className="w-full sm:w-auto" variant="destructive" onClick={clearToday}>
+              <Button type="button" className="w-full sm:w-auto font-medium bg-red-600 text-white hover:bg-red-700 shadow-sm" variant="destructive" onClick={clearToday}>
                 今日の状態を消去（新規開始）
               </Button>
             </div>
