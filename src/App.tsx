@@ -710,7 +710,7 @@ export default function TennisAppPrototype() {
         {/* 設定カード */}
         <Card className="border border-neutral-300 bg-white shadow-sm">
           <CardContent className="p-4 space-y-3">
-            <h2 className="text-lg font-bold mb-3 text-black">設定v2</h2>
+            <h2 className="text-lg font-bold mb-3 text-black">設定v3</h2>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
