@@ -735,7 +735,7 @@ export default function TennisAppPrototype() {
                 }`}
                 onClick={() => setOutdoorMode((v) => !v)}
               >
-                屋外モード
+                屋外モード: {outdoorMode ? "On" : "Off"}
               </Button>
 
               {/* 自己テスト */}
