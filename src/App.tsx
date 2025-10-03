@@ -819,7 +819,7 @@ export default function TennisAppPrototype() {
                   onTouchStart={() => startLongPress(p.id)}
                   onTouchEnd={() => endLongPress(p.id)}
                   onTouchCancel={() => endLongPress(p.id)}
-                  className={`px-3 py-2 rounded-full border text-sm flex items-center gap-1 ${
+                  className={`appearance-none px-3 py-2 rounded-full border text-sm flex items-center gap-1 ${
                     p.away
                       ? (outdoorMode
                           ? "!bg-yellow-400 !text-black !border-yellow-500"
@@ -827,7 +827,7 @@ export default function TennisAppPrototype() {
                       : p.selected
                       ? (outdoorMode
                           ? "!bg-sky-600 !text-white !border-sky-700"
-                          : "bg-black text-white border border-black")
+                          : "!bg-neutral-900 !text-white !border !border-neutral-900")
                       : (outdoorMode
                           ? "!bg-white !text-black !border-neutral-300 shadow-sm"
                           : "!bg-white !text-black !border !border-neutral-300 shadow-sm")
@@ -845,7 +845,14 @@ export default function TennisAppPrototype() {
               ヒント：タップ=選択/解除・長押し=一時離脱（スマホ）・右クリック=一時離脱（PC）
               （屋外で見づらい場合は上部の「屋外モード」をONにしてください）
             </p>
-            <Button className="mt-4 w-full" onClick={generateRound}>
+            <Button
+              className={`mt-4 w-full appearance-none ${
+                outdoorMode
+                  ? "!bg-sky-600 !text-white hover:!bg-sky-700"
+                  : "!bg-neutral-900 !text-white hover:!bg-neutral-800"
+              }`}
+              onClick={generateRound}
+            >
               次のペアを決める
             </Button>
           </CardContent>
@@ -914,7 +921,7 @@ export default function TennisAppPrototype() {
               </p>
               <div className="flex gap-2 justify-end">
                 <Button type="button" className="!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100" onClick={() => setConfirmOpen(false)}>キャンセル</Button>
-                <Button type="button" className="bg-red-600 text-white hover:bg-red-700" onClick={doClearToday}>消去する</Button>
+                <Button type="button" className="!bg-red-600 !text-white hover:!bg-red-700" onClick={doClearToday}>消去する</Button>
               </div>
             </div>
           </div>
