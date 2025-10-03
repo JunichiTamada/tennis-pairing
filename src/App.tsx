@@ -178,14 +178,8 @@ export default function TennisAppPrototype() {
   // --- ダークモード（OS 設定に追従） ---------------------------------------
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const m = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = () => {
-      const wantDark = !outdoorMode && m.matches; // 屋外モード中は常にライト
-      document.documentElement.classList.toggle("dark", wantDark);
-    };
-    apply();
-    m.addEventListener?.("change", apply);
-    return () => m.removeEventListener?.("change", apply);
+    // 常にライトテーマ（屋内モードでもOSのダーク設定に引きずられない）
+    document.documentElement.classList.remove("dark");
   }, [outdoorMode]);
 
   // --- 状態管理 -------------------------------------------------------------
@@ -710,33 +704,33 @@ export default function TennisAppPrototype() {
         {/* 設定カード */}
         <Card className="border border-neutral-300 bg-white shadow-sm">
           <CardContent className="p-4 space-y-3">
-            <h2 className="text-lg font-bold mb-3 text-black">設定v3</h2>
+            <h2 className="text-lg font-bold mb-3 text-black">設定</h2>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
                 className={`whitespace-nowrap font-medium shadow-sm border ${
                   outdoorMode
-                    ? "bg-amber-400 text-black border-amber-500 hover:bg-amber-500"
-                    : "bg-white text-black border-neutral-400 hover:bg-neutral-100"
+                    ? "!bg-amber-400 !text-black !border-amber-500 hover:!bg-amber-500"
+                    : "!bg-white !text-black !border-neutral-400 hover:!bg-neutral-100"
                 }`}
                 onClick={() => setOutdoorMode((v) => !v)}
               >
-                {outdoorMode ? "屋外モード" : "屋内モード"}
+                屋外モード
               </Button>
-              <Button variant="outline" onClick={runSelfTests} className="font-medium bg-white text-black border border-neutral-400 hover:bg-neutral-100 shadow-sm">
+              <Button variant="outline" onClick={runSelfTests} className="font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm">
                 自己テストを実行
               </Button>
-              <Button variant="outline" onClick={() => setShowHelp((v) => !v)} className="font-medium bg-white text-black border border-neutral-400 hover:bg-neutral-100 shadow-sm whitespace-nowrap">
+              <Button variant="outline" onClick={() => setShowHelp((v) => !v)} className="font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm whitespace-nowrap">
                 {showHelp ? "ヘルプを閉じる" : "ヘルプ"}
               </Button>
             </div>
 
             {/* 操作 */}
             <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end text-sm gap-2">
-              <Button type="button" className="w-full sm:w-auto font-medium bg-white text-black border border-neutral-400 hover:bg-neutral-100 shadow-sm" variant="outline" onClick={resetWeights}>
+              <Button type="button" className="w-full sm:w-auto font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm" variant="outline" onClick={resetWeights}>
                 重みをデフォルトに戻す
               </Button>
-              <Button type="button" className="w-full sm:w-auto font-medium bg-red-600 text-white hover:bg-red-700 shadow-sm" variant="destructive" onClick={clearToday}>
+              <Button type="button" className="w-full sm:w-auto font-medium !bg-red-600 !text-white hover:!bg-red-700 shadow-sm" onClick={clearToday}>
                 今日の状態を消去（新規開始）
               </Button>
             </div>
@@ -769,8 +763,8 @@ export default function TennisAppPrototype() {
 
             {/* 重みスライダー */}
             <div className="text-sm grid grid-cols-1 gap-3">
-              <label className="flex items-center gap-3">
-                <span className="w-40">同一ペア重み</span>
+              <label className="flex items-center gap-3 text-black">
+                <span className="w-40 text-black">同一ペア重み</span>
                 <input
                   type="range"
                   min={0}
@@ -780,10 +774,10 @@ export default function TennisAppPrototype() {
                   onChange={(e) => setWPartner(Number(e.target.value))}
                   className="flex-1 accent-blue-700"
                 />
-                <span className="w-8 text-right">{wPartner}</span>
+                <span className="w-8 text-right text-black">{wPartner}</span>
               </label>
-              <label className="flex items-center gap-3">
-                <span className="w-40">同一対戦重み</span>
+              <label className="flex items-center gap-3 text-black">
+                <span className="w-40 text-black">同一対戦重み</span>
                 <input
                   type="range"
                   min={0}
@@ -793,10 +787,10 @@ export default function TennisAppPrototype() {
                   onChange={(e) => setWOpp(Number(e.target.value))}
                   className="flex-1 accent-blue-700"
                 />
-                <span className="w-8 text-right">{wOpp}</span>
+                <span className="w-8 text-right text-black">{wOpp}</span>
               </label>
-              <label className="flex items-center gap-3">
-                <span className="w-40">直前類似ペナ</span>
+              <label className="flex items-center gap-3 text-black">
+                <span className="w-40 text-black">直前類似ペナ</span>
                 <input
                   type="range"
                   min={0}
@@ -806,7 +800,7 @@ export default function TennisAppPrototype() {
                   onChange={(e) => setWPrev(Number(e.target.value))}
                   className="flex-1 accent-blue-700"
                 />
-                <span className="w-8 text-right">{wPrev}</span>
+                <span className="w-8 text-right text-black">{wPrev}</span>
               </label>
             </div>
           </CardContent>
@@ -828,19 +822,19 @@ export default function TennisAppPrototype() {
                   className={`px-3 py-2 rounded-full border text-sm flex items-center gap-1 ${
                     p.away
                       ? (outdoorMode
-                          ? "bg-yellow-400 text-black border-yellow-500"
-                          : "bg-yellow-300 text-black")
+                          ? "!bg-yellow-400 !text-black !border-yellow-500"
+                          : "!bg-yellow-300 !text-black !border !border-yellow-500 font-semibold")
                       : p.selected
                       ? (outdoorMode
-                          ? "bg-sky-600 text-white border-sky-700"
-                          : "bg-blue-500 text-white")
+                          ? "!bg-sky-600 !text-white !border-sky-700"
+                          : "bg-black text-white border border-black")
                       : (outdoorMode
-                          ? "bg-white text-black border-neutral-300 shadow-sm"
-                          : "bg-gray-100 dark:bg-neutral-700")
+                          ? "!bg-white !text-black !border-neutral-300 shadow-sm"
+                          : "!bg-white !text-black !border !border-neutral-300 shadow-sm")
                   }`}
                 >
                   {displayName(p)}
-                  {p.away && <span className="text-xs">(離脱中)</span>}
+                  {p.away && <span className="text-xs font-semibold text-red-700">(離脱中)</span>}
                   {p.justReturned && !p.away && (
                     <span className="text-[10px] ml-1">★復帰</span>
                   )}
@@ -919,7 +913,7 @@ export default function TennisAppPrototype() {
                 ラウンド履歴・選択状態・離脱状態・重み設定が初期化されます。
               </p>
               <div className="flex gap-2 justify-end">
-                <Button type="button" variant="outline" onClick={() => setConfirmOpen(false)}>キャンセル</Button>
+                <Button type="button" className="!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100" onClick={() => setConfirmOpen(false)}>キャンセル</Button>
                 <Button type="button" className="bg-red-600 text-white hover:bg-red-700" onClick={doClearToday}>消去する</Button>
               </div>
             </div>
