@@ -867,10 +867,11 @@ export default function TennisAppPrototype() {
 
         {/* 次ラウンド決定（単独フレーム） */}
         <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
-          <CardContent className="p-2">
+          <CardContent className="!p-2">
             <div ref={nextFrameRef}>
               <Button
-                className={`w-full appearance-none !py-2 ${
+                size="sm"
+                className={`w-full appearance-none !h-9 !py-2 ${
                   outdoorMode
                     ? "!bg-sky-600 !text-white hover:!bg-sky-700"
                     : "!bg-neutral-900 !text-white hover:!bg-neutral-800"
