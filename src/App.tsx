@@ -175,10 +175,10 @@ function HelpContent() {
 export default function TennisAppPrototype() {
   // 屋外（高輝度）モード：ONのときは OS ダーク設定に関係なくライト配色に固定
   const [outdoorMode, setOutdoorMode] = useState(true); // 初期値をON（白背景・高輝度）
-  // --- ダークモード（OS 設定に追従） ---------------------------------------
+
+  // 端末ダーク設定の影響を無効化（常にライトベース）
   useEffect(() => {
     if (typeof window === "undefined") return;
-    // 常にライトテーマ（屋内モードでもOSのダーク設定に引きずられない）
     document.documentElement.classList.remove("dark");
   }, [outdoorMode]);
 
@@ -696,16 +696,17 @@ export default function TennisAppPrototype() {
   }
 
   // ========================================================================
-  // レンダリング（常時ライト配色：屋外視認性重視）
+  // レンダリング（屋外:白 / 屋内:濃いグレー基調）
   // ========================================================================
   return (
-    <div className={`min-h-screen ${outdoorMode ? 'bg-white' : 'bg-neutral-200'} text-gray-900`}>
+    <div className={`min-h-screen ${outdoorMode ? 'bg-white' : 'bg-neutral-300'} text-gray-900`}>
       <div className="p-4 max-w-md mx-auto space-y-6">
         {/* 設定カード */}
-        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-200'} shadow-sm`}>
+        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-300'} shadow-sm`}>
           <CardContent className="p-4 space-y-3">
             <h2 className="text-lg font-bold mb-3 text-black">設定</h2>
             <div className="flex flex-wrap items-center gap-2">
+              {/* 屋外モードトグル：文言は固定、色で状態表示 */}
               <Button
                 variant="outline"
                 className={`whitespace-nowrap font-medium shadow-sm border ${
@@ -717,9 +718,13 @@ export default function TennisAppPrototype() {
               >
                 屋外モード
               </Button>
+
+              {/* 自己テスト */}
               <Button variant="outline" onClick={runSelfTests} className="font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm">
                 自己テストを実行
               </Button>
+
+              {/* ヘルプ */}
               <Button variant="outline" onClick={() => setShowHelp((v) => !v)} className="font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm whitespace-nowrap">
                 {showHelp ? "ヘルプを閉じる" : "ヘルプ"}
               </Button>
@@ -756,7 +761,7 @@ export default function TennisAppPrototype() {
             )}
 
             {showHelp && (
-              <div className={`mt-2 p-3 rounded-lg border border-neutral-300 ${outdoorMode ? 'bg-white/90' : 'bg-neutral-200/90'}`}>
+              <div className={`mt-2 p-3 rounded-lg border border-neutral-300 ${outdoorMode ? 'bg-white/90' : 'bg-neutral-300/90'}`}>
                 <HelpContent />
               </div>
             )}
@@ -807,7 +812,7 @@ export default function TennisAppPrototype() {
         </Card>
 
         {/* 参加者選択 */}
-        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-200'} shadow-sm`}>
+        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-300'} shadow-sm`}>
           <CardContent className="p-4">
             <h2 className="text-lg font-bold mb-2">参加者を選択</h2>
             <div className="flex flex-wrap gap-2">
@@ -829,7 +834,7 @@ export default function TennisAppPrototype() {
                           ? "!bg-sky-600 !text-white !border-sky-700"
                           : "!bg-neutral-900 !text-white !border !border-neutral-900")
                       : (outdoorMode
-                          ? "!bg-white !text-black !border-neutral-300 shadow-sm"
+                          ? "!bg-white !text-black !border !border-neutral-300 shadow-sm"
                           : "!bg-white !text-black !border !border-neutral-300 shadow-sm")
                   }`}
                 >
@@ -841,9 +846,8 @@ export default function TennisAppPrototype() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-600 mt-2">
+            <p className="text-xs text-gray-700 mt-2">
               ヒント：タップ=選択/解除・長押し=一時離脱（スマホ）・右クリック=一時離脱（PC）
-              （屋外で見づらい場合は上部の「屋外モード」をONにしてください）
             </p>
             <Button
               className={`mt-4 w-full appearance-none ${
@@ -860,7 +864,7 @@ export default function TennisAppPrototype() {
 
         {/* ラウンド履歴（最新を上に表示） */}
         {rounds.length > 0 && (
-          <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-200'} shadow-sm`}>
+          <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-300'} shadow-sm`}>
             <CardContent className="p-4">
               <h2 className="text-lg font-bold mb-2">ラウンド履歴</h2>
               {rounds
@@ -884,15 +888,12 @@ export default function TennisAppPrototype() {
                       >
                         第{idx + 1}ラウンド {isLatest && "(最新)"}
                       </p>
-                      <p
-                        className={`${
-                          isLatest ? "text-xl font-bold text-blue-900" : ""
-                        }`}
-                      >
-                        {r.pairA.map((p: any) => displayName(p)).join("・")} vs {r.pairB
-                          .map((p: any) => displayName(p))
-                          .join("・")}
-                      </p>
+                      {/* 3行表示：1行目=ペアA / 2行目=vs / 3行目=ペアB */}
+                      <div className={`${isLatest ? "text-blue-900" : ""} text-center`}>
+                        <p className={`${isLatest ? "text-xl font-bold" : ""}`}>{r.pairA.map((p: any) => displayName(p)).join("・")}</p>
+                        <p className={`my-0.5 font-bold ${isLatest ? "text-2xl" : "text-base"}`}>vs</p>
+                        <p className={`${isLatest ? "text-xl font-bold" : ""}`}>{r.pairB.map((p: any) => displayName(p)).join("・")}</p>
+                      </div>
                       {r.rest.length > 0 && (
                         <p
                           className={`text-sm ${
@@ -913,7 +914,7 @@ export default function TennisAppPrototype() {
         {confirmOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmOpen(false)} />
-            <div className={`relative z-10 w-[92%] max-w-sm rounded-xl ${outdoorMode ? 'bg-white' : 'bg-neutral-200'} text-gray-900 p-4 shadow-xl border border-neutral-300`}>
+            <div className={`relative z-10 w-[92%] max-w-sm rounded-xl ${outdoorMode ? 'bg-white' : 'bg-neutral-300'} text-gray-900 p-4 shadow-xl border border-neutral-300`}>
               <h3 className="text-base font-semibold mb-2">今日の状態を消去</h3>
               <p className="text-sm text-gray-700 mb-4">
                 本当に今日の状態を消去して新規開始しますか？<br/>
