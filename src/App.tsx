@@ -214,6 +214,21 @@ export default function TennisAppPrototype() {
   const longPressFired = useRef<Record<number, boolean>>({});
   const LONG_PRESS_MS = 500;
 
+  // ========= 自動スクロール（最新ラウンド/操作位置へ） =========
+  const latestRef = useRef<HTMLDivElement | null>(null);
+  const participantRef = useRef<HTMLHeadingElement | null>(null);
+  const nextFrameRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (rounds.length > 0) {
+      const target = nextFrameRef.current || participantRef.current || latestRef.current;
+      if (target) {
+        const top = target.getBoundingClientRect().top + window.scrollY;
+        window.scrollTo({ top: Math.max(0, top - 24), behavior: "smooth" });
+      }
+    }
+  }, [rounds.length]);
+  // ==========================================================
+
   // 表示名（登録名 + さん）
   const displayName = (p: { name: string }) => `${p.name}さん`;
 
@@ -814,7 +829,7 @@ export default function TennisAppPrototype() {
         {/* 参加者選択 */}
         <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
           <CardContent className="p-4">
-            <h2 className="text-lg font-bold mb-2">参加者を選択</h2>
+            <h2 ref={participantRef} className="text-lg font-bold mb-2">参加者を選択</h2>
             <div className="flex flex-wrap gap-2">
               {participants.map((p) => (
                 <button
@@ -847,16 +862,24 @@ export default function TennisAppPrototype() {
             <p className="text-xs text-gray-900 mt-2">
               ヒント：タップ=選択/解除・長押し=一時離脱（スマホ）・右クリック=一時離脱（PC）
             </p>
-            <Button
-              className={`mt-4 w-full appearance-none ${
-                outdoorMode
-                  ? "!bg-sky-600 !text-white hover:!bg-sky-700"
-                  : "!bg-neutral-900 !text-white hover:!bg-neutral-800"
-              }`}
-              onClick={generateRound}
-            >
-              次のペアを決める
-            </Button>
+          </CardContent>
+        </Card>
+
+        {/* 次ラウンド決定（単独フレーム） */}
+        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
+          <CardContent className="p-4">
+            <div ref={nextFrameRef}>
+              <Button
+                className={`w-full appearance-none ${
+                  outdoorMode
+                    ? "!bg-sky-600 !text-white hover:!bg-sky-700"
+                    : "!bg-neutral-900 !text-white hover:!bg-neutral-800"
+                }`}
+                onClick={generateRound}
+              >
+                次のペアを決める
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -872,6 +895,7 @@ export default function TennisAppPrototype() {
                   const isLatest = idx === rounds.length - 1;
                   return (
                     <div
+                      ref={isLatest ? latestRef : undefined}
                       key={idx}
                       className={`mb-3 ${
                         isLatest
