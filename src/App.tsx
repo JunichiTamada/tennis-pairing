@@ -699,10 +699,10 @@ export default function TennisAppPrototype() {
   // レンダリング（屋外:白 / 屋内:濃いグレー基調）
   // ========================================================================
   return (
-    <div className={`min-h-screen ${outdoorMode ? 'bg-white' : 'bg-neutral-300'} text-gray-900`}>
+    <div className={`min-h-screen ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} text-gray-900`}>
       <div className="p-4 max-w-md mx-auto space-y-6">
         {/* 設定カード */}
-        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-300'} shadow-sm`}>
+        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
           <CardContent className="p-4 space-y-3">
             <h2 className="text-lg font-bold mb-3 text-black">設定</h2>
             <div className="flex flex-wrap items-center gap-2">
@@ -761,7 +761,7 @@ export default function TennisAppPrototype() {
             )}
 
             {showHelp && (
-              <div className={`mt-2 p-3 rounded-lg border border-neutral-300 ${outdoorMode ? 'bg-white/90' : 'bg-neutral-300/90'}`}>
+              <div className={`mt-2 p-3 rounded-lg border border-neutral-300 ${outdoorMode ? 'bg-white/90' : 'bg-neutral-500/90'}`}>
                 <HelpContent />
               </div>
             )}
@@ -812,7 +812,7 @@ export default function TennisAppPrototype() {
         </Card>
 
         {/* 参加者選択 */}
-        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-300'} shadow-sm`}>
+        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
           <CardContent className="p-4">
             <h2 className="text-lg font-bold mb-2">参加者を選択</h2>
             <div className="flex flex-wrap gap-2">
@@ -830,9 +830,7 @@ export default function TennisAppPrototype() {
                           ? "!bg-yellow-400 !text-black !border-yellow-500"
                           : "!bg-yellow-300 !text-black !border !border-yellow-500 font-semibold")
                       : p.selected
-                      ? (outdoorMode
-                          ? "!bg-sky-600 !text-white !border-sky-700"
-                          : "!bg-neutral-900 !text-white !border !border-neutral-900")
+                      ? (outdoorMode ? "!bg-sky-600 !text-white !border-sky-700" : "!bg-black !text-neutral-200 !border !border-black font-semibold")
                       : (outdoorMode
                           ? "!bg-white !text-black !border !border-neutral-300 shadow-sm"
                           : "!bg-white !text-black !border !border-neutral-300 shadow-sm")
@@ -846,7 +844,7 @@ export default function TennisAppPrototype() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-700 mt-2">
+            <p className="text-xs text-gray-900 mt-2">
               ヒント：タップ=選択/解除・長押し=一時離脱（スマホ）・右クリック=一時離脱（PC）
             </p>
             <Button
@@ -864,7 +862,7 @@ export default function TennisAppPrototype() {
 
         {/* ラウンド履歴（最新を上に表示） */}
         {rounds.length > 0 && (
-          <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-300'} shadow-sm`}>
+          <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
             <CardContent className="p-4">
               <h2 className="text-lg font-bold mb-2">ラウンド履歴</h2>
               {rounds
@@ -914,9 +912,9 @@ export default function TennisAppPrototype() {
         {confirmOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmOpen(false)} />
-            <div className={`relative z-10 w-[92%] max-w-sm rounded-xl ${outdoorMode ? 'bg-white' : 'bg-neutral-300'} text-gray-900 p-4 shadow-xl border border-neutral-300`}>
+            <div className={`relative z-10 w-[92%] max-w-sm rounded-xl ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} text-gray-900 p-4 shadow-xl border border-neutral-300`}>
               <h3 className="text-base font-semibold mb-2">今日の状態を消去</h3>
-              <p className="text-sm text-gray-700 mb-4">
+              <p className="text-sm text-gray-900 mb-4">
                 本当に今日の状態を消去して新規開始しますか？<br/>
                 ラウンド履歴・選択状態・離脱状態・重み設定が初期化されます。
               </p>
