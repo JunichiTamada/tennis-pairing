@@ -221,9 +221,13 @@ export default function TennisAppPrototype() {
   useEffect(() => {
     if (rounds.length > 0) {
       const target = nextFrameRef.current || participantRef.current || latestRef.current;
-      if (target) {
-        const top = target.getBoundingClientRect().top + window.scrollY;
-        window.scrollTo({ top: Math.max(0, top - 24), behavior: "smooth" });
+      if (target instanceof HTMLElement) {
+        // Scroll to the card container so its top border stays in view.
+        const cardRoot = target.closest('[data-slot="card"]') as HTMLElement | null;
+        const scrollEl = cardRoot || target;
+        const offset = cardRoot ? 8 : 24;
+        const top = scrollEl.getBoundingClientRect().top + window.scrollY;
+        window.scrollTo({ top: Math.max(0, top - offset), behavior: "smooth" });
       }
     }
   }, [rounds.length]);
