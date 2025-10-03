@@ -699,10 +699,10 @@ export default function TennisAppPrototype() {
   // レンダリング（常時ライト配色：屋外視認性重視）
   // ========================================================================
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className={`min-h-screen ${outdoorMode ? 'bg-white' : 'bg-neutral-200'} text-gray-900`}>
       <div className="p-4 max-w-md mx-auto space-y-6">
         {/* 設定カード */}
-        <Card className="border border-neutral-300 bg-white shadow-sm">
+        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-200'} shadow-sm`}>
           <CardContent className="p-4 space-y-3">
             <h2 className="text-lg font-bold mb-3 text-black">設定</h2>
             <div className="flex flex-wrap items-center gap-2">
@@ -756,7 +756,7 @@ export default function TennisAppPrototype() {
             )}
 
             {showHelp && (
-              <div className="mt-2 p-3 rounded-lg border border-neutral-300 bg-white/90">
+              <div className={`mt-2 p-3 rounded-lg border border-neutral-300 ${outdoorMode ? 'bg-white/90' : 'bg-neutral-200/90'}`}>
                 <HelpContent />
               </div>
             )}
@@ -807,7 +807,7 @@ export default function TennisAppPrototype() {
         </Card>
 
         {/* 参加者選択 */}
-        <Card className="border border-neutral-300 bg-white shadow-sm">
+        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-200'} shadow-sm`}>
           <CardContent className="p-4">
             <h2 className="text-lg font-bold mb-2">参加者を選択</h2>
             <div className="flex flex-wrap gap-2">
@@ -860,7 +860,7 @@ export default function TennisAppPrototype() {
 
         {/* ラウンド履歴（最新を上に表示） */}
         {rounds.length > 0 && (
-          <Card className="border border-neutral-300 bg-white shadow-sm">
+          <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-200'} shadow-sm`}>
             <CardContent className="p-4">
               <h2 className="text-lg font-bold mb-2">ラウンド履歴</h2>
               {rounds
@@ -913,7 +913,7 @@ export default function TennisAppPrototype() {
         {confirmOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmOpen(false)} />
-            <div className="relative z-10 w-[92%] max-w-sm rounded-xl bg-white text-gray-900 p-4 shadow-xl border border-neutral-300">
+            <div className={`relative z-10 w-[92%] max-w-sm rounded-xl ${outdoorMode ? 'bg-white' : 'bg-neutral-200'} text-gray-900 p-4 shadow-xl border border-neutral-300`}>
               <h3 className="text-base font-semibold mb-2">今日の状態を消去</h3>
               <p className="text-sm text-gray-700 mb-4">
                 本当に今日の状態を消去して新規開始しますか？<br/>
