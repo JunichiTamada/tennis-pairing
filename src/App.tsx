@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -142,35 +143,65 @@ function isForbiddenFlipGivenPrev(prev: any | null, candidate: any) {
 // ============================================================================
 function HelpContent() {
   return (
-    <div className="space-y-3 text-sm leading-6">
-      <p className="font-semibold">重みが結果に与える影響</p>
-      <ul className="list-disc pl-5 space-y-1">
-        <li>
-          <strong>同一ペア重み (wPartner)</strong>：同じ2人の再ペアを避けたいほど値を上げる。
-        </li>
-        <li>
-          <strong>同一対戦重み (wOpp)</strong>：同じ相手と当たり続けるのを避けたいほど値を上げる。
-        </li>
-        <li>
-          <strong>直前類似ペナ (wPrev)</strong>：直前ラウンドと似た配置を避けたいほど値を上げる。
-        </li>
-      </ul>
-      <p className="font-semibold">ハード制約</p>
-      <ul className="list-disc pl-5 space-y-1">
-        <li>AB vs CD → BA vs DC の<strong>反転禁止</strong>は常に適用。</li>
-        <li><strong>連続休み回避</strong>は固定値ペナルティ（現状 +5）。</li>
-      </ul>
-      <p className="font-semibold">補足</p>
-      <ul className="list-disc pl-5 space-y-1">
-        <li>同じ参加者でも<strong>初回の組み合わせはランダムで変わります</strong>。</li>
-        <li>今日のラウンド履歴はアプリを閉じても<strong>自動的に保存</strong>されます。翌日になると自動で新しく始まります。やり直したいときは「今日の状態を消去」を押してください。</li>
-      </ul>
-    </div>
+    <ErrorBoundary>
+      <div className="space-y-3 text-sm leading-6">
+        <p className="font-semibold">重みが結果に与える影響</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>
+            <strong>同一ペア重み (wPartner)</strong>：同じ2人の再ペアを避けたいほど値を上げる。
+          </li>
+          <li>
+            <strong>同一対戦重み (wOpp)</strong>：同じ相手と当たり続けるのを避けたいほど値を上げる。
+          </li>
+          <li>
+            <strong>直前類似ペナ (wPrev)</strong>：直前ラウンドと似た配置を避けたいほど値を上げる。
+          </li>
+        </ul>
+        <p className="font-semibold">ハード制約</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>AB vs CD → BA vs DC の<strong>反転禁止</strong>は常に適用。</li>
+          <li><strong>連続休み回避</strong>は固定値ペナルティ（現状 +5）。</li>
+        </ul>
+        <p className="font-semibold">補足</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>同じ参加者でも<strong>初回の組み合わせはランダムで変わります</strong>。</li>
+          <li>今日のラウンド履歴はアプリを閉じても<strong>自動的に保存</strong>されます。翌日になると自動で新しく始まります。やり直したいときは「今日の状態を消去」を押してください。</li>
+        </ul>
+      </div>
+    </ErrorBoundary>
   );
 }
 
 // ============================================================================
 // メインコンポーネント
+// 予防線：ランタイム例外時に真っ白化を防ぐ簡易エラーバウンダリ（Android Chrome実機対策を含む）
+class ErrorBoundary extends React.Component<React.PropsWithChildren, { hasError: boolean; message: string }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, message: "" };
+  }
+  static getDerivedStateFromError(err: any) {
+    return { hasError: true, message: String(err?.message || err) };
+  }
+  componentDidCatch(err: any, info: any) {
+    try { console.error("ErrorBoundary caught:", err, info); } catch {}
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 max-w-md mx-auto">
+          <div className="rounded border border-red-300 bg-red-50 text-red-900 p-3">
+            <p className="font-semibold mb-1">エラーが発生しました</p>
+            <p className="text-sm break-words">{this.state.message}</p>
+            <p className="text-xs text-red-800 mt-2">ページを再読み込みしてください。</p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children as any;
+  }
+}
+
 // ============================================================================
 export default function TennisAppPrototype() {
   // 屋外（高輝度）モード：ONのときは OS ダーク設定に関係なくライト配色に固定
@@ -221,13 +252,19 @@ export default function TennisAppPrototype() {
   useEffect(() => {
     if (rounds.length > 0) {
       const target = nextFrameRef.current || participantRef.current || latestRef.current;
-      if (target instanceof HTMLElement) {
-        // Scroll to the card container so its top border stays in view.
-        const cardRoot = target.closest('[data-slot="card"]') as HTMLElement | null;
-        const scrollEl = cardRoot || target;
-        const offset = cardRoot ? 8 : 24;
-        const top = scrollEl.getBoundingClientRect().top + window.scrollY;
-        window.scrollTo({ top: Math.max(0, top - offset), behavior: "smooth" });
+      if (target) {
+        const top = target.getBoundingClientRect().top + window.scrollY;
+        // Android Chrome では稀に smooth で描画が不安定になるケースがあるためフォールバック
+        const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+        const isAndroidChrome = /Android/i.test(ua) && /Chrome/i.test(ua);
+        const behavior: ScrollBehavior = isAndroidChrome ? 'auto' : 'smooth';
+        requestAnimationFrame(() => {
+          try {
+            window.scrollTo({ top: Math.max(0, top - 8), behavior });
+          } catch {
+            window.scrollTo(0, Math.max(0, top - 8));
+          }
+        });
       }
     }
   }, [rounds.length]);
@@ -468,65 +505,70 @@ export default function TennisAppPrototype() {
 
   // ラウンド生成（最小スコアの組合せを採用）
   const generateRound = () => {
-    // 1) アクティブかつ選択中のみ抽出
-    let pool = participants.filter((p) => p.selected && !p.away);
-    if (pool.length < 4) {
-      alert("4名以上を選択してください");
-      return;
-    }
+    try {
+      // 1) アクティブかつ選択中のみ抽出
+      let pool = participants.filter((p) => p.selected && !p.away);
+      if (pool.length < 4) {
+        alert("4名以上を選択してください");
+        return;
+      }
 
-    // 2) 並び替え：復帰者を最優先、直前休みは後方へ
-    const prev = lastRound();
-    const lastRestIds = new Set(prev ? prev.rest.map((x: any) => x.id) : []);
-    pool = [...pool].sort((a, b) => {
-      const r = Number(b.justReturned) - Number(a.justReturned);
-      if (r !== 0) return r;
-      const aLastRest = lastRestIds.has(a.id) ? 1 : 0;
-      const bLastRest = lastRestIds.has(b.id) ? 1 : 0;
-      return aLastRest - bLastRest;
-    });
+      // 2) 並び替え：復帰者を最優先、直前休みは後方へ
+      const prev = lastRound();
+      const lastRestIds = new Set(prev ? prev.rest.map((x: any) => x.id) : []);
+      pool = [...pool].sort((a, b) => {
+        const r = Number(b.justReturned) - Number(a.justReturned);
+        if (r !== 0) return r;
+        const aLastRest = lastRestIds.has(a.id) ? 1 : 0;
+        const bLastRest = lastRestIds.has(b.id) ? 1 : 0;
+        return aLastRest - bLastRest;
+      });
 
-    // 3) 当日履歴の集計
-    const counts = buildStats(rounds);
+      // 3) 当日履歴の集計
+      const counts = buildStats(rounds);
 
-    // 4) 4人組の候補（最大200件）に対して3通りのペアリングを評価
-    const quads = combinations(pool, 4).slice(0, 200);
+      // 4) 4人組の候補（最大200件）に対して3通りのペアリングを評価
+      const quads = combinations(pool, 4).slice(0, 200);
 
-    // ★ 同点最良候補からランダム（当日シードで再現性あり）
-    let bestScore = Number.POSITIVE_INFINITY;
-    let bestCandidates: any[] = [];
+      // ★ 同点最良候補からランダム（当日シードで再現性あり）
+      let bestScore = Number.POSITIVE_INFINITY;
+      let bestCandidates: any[] = [];
 
-    for (const quad of quads) {
-      const quadIds = new Set(quad.map((x) => x.id));
-      const rest = pool.filter((p) => !quadIds.has(p.id));
-      for (const pairing of pairingsOfFour(quad)) {
-        if (isForbiddenFlip(pairing)) continue; // 反転禁止
-        const score = scoreByHistory(pairing, rest, counts);
-        if (score < bestScore - 1e-9) {
-          bestScore = score;
-          bestCandidates = [{ match: { ...pairing, rest }, score }];
-        } else if (Math.abs(score - bestScore) <= 1e-9) {
-          bestCandidates.push({ match: { ...pairing, rest }, score });
+      for (const quad of quads) {
+        const quadIds = new Set(quad.map((x) => x.id));
+        const rest = pool.filter((p) => !quadIds.has(p.id));
+        for (const pairing of pairingsOfFour(quad)) {
+          if (isForbiddenFlip(pairing)) continue; // 反転禁止
+          const score = scoreByHistory(pairing, rest, counts);
+          if (score < bestScore - 1e-9) {
+            bestScore = score;
+            bestCandidates = [{ match: { ...pairing, rest }, score }];
+          } else if (Math.abs(score - bestScore) <= 1e-9) {
+            bestCandidates.push({ match: { ...pairing, rest }, score });
+          }
         }
       }
+
+      if (bestCandidates.length === 0) {
+        alert("候補が見つかりません。休憩者や選択を調整してください。");
+        return;
+      }
+
+      const idx = Math.floor(randRef.current() * bestCandidates.length);
+      const chosen = bestCandidates[idx];
+
+      // 5) 採用＆状態更新（復帰フラグを消費）
+      setRounds((prevRounds) => [...prevRounds, chosen.match]);
+      const chosenIds = new Set(
+        [...chosen.match.pairA, ...chosen.match.pairB].map((c: any) => c.id)
+      );
+      setParticipants((prevParts) =>
+        prevParts.map((p) => (chosenIds.has(p.id) ? { ...p, justReturned: false } : p))
+      );
+    } catch (e) {
+      try { console.error('generateRound error:', e); } catch {}
+      alert('エラーが発生しました。ページを再読み込みしてください。');
     }
-
-    if (bestCandidates.length === 0) {
-      alert("候補が見つかりません。休憩者や選択を調整してください。");
-      return;
-    }
-
-    const idx = Math.floor(randRef.current() * bestCandidates.length);
-    const chosen = bestCandidates[idx];
-
-    // 5) 採用＆状態更新（復帰フラグを消費）
-    setRounds((prevRounds) => [...prevRounds, chosen.match]);
-    const chosenIds = new Set(
-      [...chosen.match.pairA, ...chosen.match.pairB].map((c: any) => c.id)
-    );
-    setParticipants((prevParts) =>
-      prevParts.map((p) => (chosenIds.has(p.id) ? { ...p, justReturned: false } : p))
-    );
   };
 
   // ========================================================================
@@ -718,243 +760,245 @@ export default function TennisAppPrototype() {
   // レンダリング（屋外:白 / 屋内:濃いグレー基調）
   // ========================================================================
   return (
-    <div className={`min-h-screen ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} text-gray-900`}>
-      <div className="p-4 max-w-md mx-auto space-y-6">
-        {/* 設定カード */}
-        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
-          <CardContent className="p-4 space-y-3">
-            <h2 className="text-lg font-bold mb-3 text-black">設定</h2>
-            <div className="flex flex-wrap items-center gap-2">
-              {/* 屋外モードトグル：文言は固定、色で状態表示 */}
-              <Button
-                variant="outline"
-                className={`whitespace-nowrap font-medium shadow-sm border ${
-                  outdoorMode
-                    ? "!bg-amber-400 !text-black !border-amber-500 hover:!bg-amber-500"
-                    : "!bg-white !text-black !border-neutral-400 hover:!bg-neutral-100"
-                }`}
-                onClick={() => setOutdoorMode((v) => !v)}
-              >
-                屋外モード: {outdoorMode ? "On" : "Off"}
-              </Button>
-
-              {/* 自己テスト */}
-              <Button variant="outline" onClick={runSelfTests} className="font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm">
-                自己テストを実行
-              </Button>
-
-              {/* ヘルプ */}
-              <Button variant="outline" onClick={() => setShowHelp((v) => !v)} className="font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm whitespace-nowrap">
-                {showHelp ? "ヘルプを閉じる" : "ヘルプ"}
-              </Button>
-            </div>
-
-            {/* 操作 */}
-            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end text-sm gap-2">
-              <Button type="button" className="w-full sm:w-auto font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm" variant="outline" onClick={resetWeights}>
-                重みをデフォルトに戻す
-              </Button>
-              <Button type="button" className="w-full sm:w-auto font-medium !bg-red-600 !text-white hover:!bg-red-700 shadow-sm" onClick={clearToday}>
-                今日の状態を消去（新規開始）
-              </Button>
-            </div>
-
-            {testResults.length > 0 && (
-              <div className="text-xs bg-gray-50 border border-neutral-300 rounded p-2 space-y-1">
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold m-0">Self-test results</p>
-                  <Button
-                    variant="ghost"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => setTestResults([])}
-                  >
-                    閉じる
-                  </Button>
-                </div>
-                <ul className="list-disc pl-5 mt-1">
-                  {testResults.map((t, i) => (
-                    <li key={i}>{t}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {showHelp && (
-              <div className={`mt-2 p-3 rounded-lg border border-neutral-300 ${outdoorMode ? 'bg-white/90' : 'bg-neutral-500/90'}`}>
-                <HelpContent />
-              </div>
-            )}
-
-            {/* 重みスライダー */}
-            <div className="text-sm grid grid-cols-1 gap-3">
-              <label className="flex items-center gap-3 text-black">
-                <span className="w-40 text-black">同一ペア重み</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={5}
-                  step={1}
-                  value={wPartner}
-                  onChange={(e) => setWPartner(Number(e.target.value))}
-                  className="flex-1 accent-blue-700"
-                />
-                <span className="w-8 text-right text-black">{wPartner}</span>
-              </label>
-              <label className="flex items-center gap-3 text-black">
-                <span className="w-40 text-black">同一対戦重み</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={5}
-                  step={1}
-                  value={wOpp}
-                  onChange={(e) => setWOpp(Number(e.target.value))}
-                  className="flex-1 accent-blue-700"
-                />
-                <span className="w-8 text-right text-black">{wOpp}</span>
-              </label>
-              <label className="flex items-center gap-3 text-black">
-                <span className="w-40 text-black">直前類似ペナ</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={5}
-                  step={1}
-                  value={wPrev}
-                  onChange={(e) => setWPrev(Number(e.target.value))}
-                  className="flex-1 accent-blue-700"
-                />
-                <span className="w-8 text-right text-black">{wPrev}</span>
-              </label>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 参加者選択 */}
-        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
-          <CardContent className="p-4">
-            <h2 ref={participantRef} className="text-lg font-bold mb-2">参加者を選択</h2>
-            <div className="flex flex-wrap gap-2">
-              {participants.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => handleNameClick(p.id)}
-                  onContextMenu={(e) => handleMouseDown(p.id, e)}
-                  onTouchStart={() => startLongPress(p.id)}
-                  onTouchEnd={() => endLongPress(p.id)}
-                  onTouchCancel={() => endLongPress(p.id)}
-                  className={`appearance-none px-3 py-2 rounded-full border text-sm flex items-center gap-1 ${
-                    p.away
-                      ? (outdoorMode
-                          ? "!bg-yellow-400 !text-black !border-yellow-500"
-                          : "!bg-yellow-300 !text-black !border !border-yellow-500 font-semibold")
-                      : p.selected
-                      ? (outdoorMode ? "!bg-sky-600 !text-white !border-sky-700" : "!bg-black !text-neutral-200 !border !border-black font-semibold")
-                      : (outdoorMode
-                          ? "!bg-white !text-black !border !border-neutral-300 shadow-sm"
-                          : "!bg-white !text-black !border !border-neutral-300 shadow-sm")
-                  }`}
-                >
-                  {displayName(p)}
-                  {p.away && <span className="text-xs font-semibold text-red-700">(離脱中)</span>}
-                  {p.justReturned && !p.away && (
-                    <span className="text-[10px] ml-1">★復帰</span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-900 mt-2">
-              ヒント：タップ=選択/解除・長押し=一時離脱（スマホ）・右クリック=一時離脱（PC）
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* 次ラウンド決定（単独フレーム） */}
-        <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
-          <CardContent className="!p-2">
-            <div ref={nextFrameRef}>
-              <Button
-                size="sm"
-                className={`w-full appearance-none !h-9 !py-2 ${
-                  outdoorMode
-                    ? "!bg-sky-600 !text-white hover:!bg-sky-700"
-                    : "!bg-neutral-900 !text-white hover:!bg-neutral-800"
-                }`}
-                onClick={generateRound}
-              >
-                次のペアを決める
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ラウンド履歴（最新を上に表示） */}
-        {rounds.length > 0 && (
+    <ErrorBoundary>
+      <div className={`min-h-screen ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} text-gray-900`}>
+        <div className="p-4 max-w-md mx-auto space-y-6">
+          {/* 設定カード */}
           <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
-            <CardContent className="p-4">
-              <h2 className="text-lg font-bold mb-2">ラウンド履歴</h2>
-              {rounds
-                .map((r, idx) => ({ r, idx }))
-                .reverse()
-                .map(({ r, idx }) => {
-                  const isLatest = idx === rounds.length - 1;
-                  return (
-                    <div
-                      ref={isLatest ? latestRef : undefined}
-                      key={idx}
-                      className={`mb-3 ${
-                        isLatest
-                          ? "bg-blue-50 border-l-4 border-blue-500 p-2 rounded"
-                          : ""
-                      }`}
+            <CardContent className="p-4 space-y-3">
+              <h2 className="text-lg font-bold mb-3 text-black">設定</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* 屋外モードトグル：文言は固定、色で状態表示 */}
+                <Button
+                  variant="outline"
+                  className={`whitespace-nowrap font-medium shadow-sm border ${
+                    outdoorMode
+                      ? "!bg-amber-400 !text-black !border-amber-500 hover:!bg-amber-500"
+                      : "!bg-white !text-black !border-neutral-400 hover:!bg-neutral-100"
+                  }`}
+                  onClick={() => setOutdoorMode((v) => !v)}
+                >
+                  屋外モード
+                </Button>
+
+                {/* 自己テスト */}
+                <Button variant="outline" onClick={runSelfTests} className="font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm">
+                  自己テストを実行
+                </Button>
+
+                {/* ヘルプ */}
+                <Button variant="outline" onClick={() => setShowHelp((v) => !v)} className="font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm whitespace-nowrap">
+                  {showHelp ? "ヘルプを閉じる" : "ヘルプ"}
+                </Button>
+              </div>
+
+              {/* 操作 */}
+              <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end text-sm gap-2">
+                <Button type="button" className="w-full sm:w-auto font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm" variant="outline" onClick={resetWeights}>
+                  重みをデフォルトに戻す
+                </Button>
+                <Button type="button" className="w-full sm:w-auto font-medium !bg-red-600 !text-white hover:!bg-red-700 shadow-sm" onClick={clearToday}>
+                  今日の状態を消去（新規開始）
+                </Button>
+              </div>
+
+              {testResults.length > 0 && (
+                <div className="text-xs bg-gray-50 border border-neutral-300 rounded p-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold m-0">Self-test results</p>
+                    <Button
+                      variant="ghost"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setTestResults([])}
                     >
-                      <p
-                        className={`font-semibold ${
-                          isLatest ? "text-lg text-blue-800" : ""
-                        }`}
-                      >
-                        第{idx + 1}ラウンド {isLatest && "(最新)"}
-                      </p>
-                      {/* 3行表示：1行目=ペアA / 2行目=vs / 3行目=ペアB */}
-                      <div className={`${isLatest ? "text-blue-900" : ""} text-center`}>
-                        <p className={`${isLatest ? "text-xl font-bold" : ""}`}>{r.pairA.map((p: any) => displayName(p)).join("・")}</p>
-                        <p className={`my-0.5 font-bold ${isLatest ? "text-2xl" : "text-base"}`}>vs</p>
-                        <p className={`${isLatest ? "text-xl font-bold" : ""}`}>{r.pairB.map((p: any) => displayName(p)).join("・")}</p>
-                      </div>
-                      {r.rest.length > 0 && (
-                        <p
-                          className={`text-sm ${
-                            isLatest ? "text-blue-700" : "text-gray-700"
-                          }`}
-                        >
-                          休憩: {r.rest.map((p: any) => displayName(p)).join("・")}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
+                      閉じる
+                    </Button>
+                  </div>
+                  <ul className="list-disc pl-5 mt-1">
+                    {testResults.map((t, i) => (
+                      <li key={i}>{t}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {showHelp && (
+                <div className={`mt-2 p-3 rounded-lg border border-neutral-300 ${outdoorMode ? 'bg-white/90' : 'bg-neutral-500/90'}`}>
+                  <HelpContent />
+                </div>
+              )}
+
+              {/* 重みスライダー */}
+              <div className="text-sm grid grid-cols-1 gap-3">
+                <label className="flex items-center gap-3 text-black">
+                  <span className="w-40 text-black">同一ペア重み</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={5}
+                    step={1}
+                    value={wPartner}
+                    onChange={(e) => setWPartner(Number(e.target.value))}
+                    className="flex-1 accent-blue-700"
+                  />
+                  <span className="w-8 text-right text-black">{wPartner}</span>
+                </label>
+                <label className="flex items-center gap-3 text-black">
+                  <span className="w-40 text-black">同一対戦重み</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={5}
+                    step={1}
+                    value={wOpp}
+                    onChange={(e) => setWOpp(Number(e.target.value))}
+                    className="flex-1 accent-blue-700"
+                  />
+                  <span className="w-8 text-right text-black">{wOpp}</span>
+                </label>
+                <label className="flex items-center gap-3 text-black">
+                  <span className="w-40 text-black">直前類似ペナ</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={5}
+                    step={1}
+                    value={wPrev}
+                    onChange={(e) => setWPrev(Number(e.target.value))}
+                    className="flex-1 accent-blue-700"
+                  />
+                  <span className="w-8 text-right text-black">{wPrev}</span>
+                </label>
+              </div>
             </CardContent>
           </Card>
-        )}
 
-        {/* クリア確認モーダル（自前実装） */}
-        {confirmOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmOpen(false)} />
-            <div className={`relative z-10 w-[92%] max-w-sm rounded-xl ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} text-gray-900 p-4 shadow-xl border border-neutral-300`}>
-              <h3 className="text-base font-semibold mb-2">今日の状態を消去</h3>
-              <p className="text-sm text-gray-900 mb-4">
-                本当に今日の状態を消去して新規開始しますか？<br/>
-                ラウンド履歴・選択状態・離脱状態・重み設定が初期化されます。
+          {/* 参加者選択 */}
+          <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
+            <CardContent className="p-4">
+              <h2 ref={participantRef} className="text-lg font-bold mb-2">参加者を選択</h2>
+              <div className="flex flex-wrap gap-2">
+                {participants.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleNameClick(p.id)}
+                    onContextMenu={(e) => handleMouseDown(p.id, e)}
+                    onTouchStart={() => startLongPress(p.id)}
+                    onTouchEnd={() => endLongPress(p.id)}
+                    onTouchCancel={() => endLongPress(p.id)}
+                    className={`appearance-none px-3 py-2 rounded-full border text-sm flex items-center gap-1 ${
+                      p.away
+                        ? (outdoorMode
+                            ? "!bg-yellow-400 !text-black !border-yellow-500"
+                            : "!bg-yellow-300 !text-black !border !border-yellow-500 font-semibold")
+                        : p.selected
+                        ? (outdoorMode ? "!bg-sky-600 !text-white !border-sky-700" : "!bg-black !text-neutral-200 !border !border-black font-semibold")
+                        : (outdoorMode
+                            ? "!bg-white !text-black !border !border-neutral-300 shadow-sm"
+                            : "!bg-white !text-black !border !border-neutral-300 shadow-sm")
+                    }`}
+                  >
+                    {displayName(p)}
+                    {p.away && <span className="text-xs font-semibold text-red-700">(離脱中)</span>}
+                    {p.justReturned && !p.away && (
+                      <span className="text-[10px] ml-1">★復帰</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-900 mt-2">
+                ヒント：タップ=選択/解除・長押し=一時離脱（スマホ）・右クリック=一時離脱（PC）
               </p>
-              <div className="flex gap-2 justify-end">
-                <Button type="button" className="!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100" onClick={() => setConfirmOpen(false)}>キャンセル</Button>
-                <Button type="button" className="!bg-red-600 !text-white hover:!bg-red-700" onClick={doClearToday}>消去する</Button>
+            </CardContent>
+          </Card>
+
+          {/* 次ラウンド決定（単独フレーム） */}
+          <Card ref={nextFrameRef} className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
+            <CardContent className="!p-2">
+              <div>
+                <Button
+                  size="sm"
+                  className={`w-full appearance-none !h-9 !py-2 ${
+                    outdoorMode
+                      ? "!bg-sky-600 !text-white hover:!bg-sky-700"
+                      : "!bg-neutral-900 !text-white hover:!bg-neutral-800"
+                  }`}
+                  onClick={generateRound}
+                >
+                  次のペアを決める
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ラウンド履歴（最新を上に表示） */}
+          {rounds.length > 0 && (
+            <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
+              <CardContent className="p-4">
+                <h2 className="text-lg font-bold mb-2">ラウンド履歴</h2>
+                {rounds
+                  .map((r, idx) => ({ r, idx }))
+                  .reverse()
+                  .map(({ r, idx }) => {
+                    const isLatest = idx === rounds.length - 1;
+                    return (
+                      <div
+                        ref={isLatest ? latestRef : undefined}
+                        key={idx}
+                        className={`mb-3 ${
+                          isLatest
+                            ? "bg-blue-50 border-l-4 border-blue-500 p-2 rounded"
+                            : ""
+                        }`}
+                      >
+                        <p
+                          className={`font-semibold ${
+                            isLatest ? "text-lg text-blue-800" : ""
+                          }`}
+                        >
+                          第{idx + 1}ラウンド {isLatest && "(最新)"}
+                        </p>
+                        {/* 3行表示：1行目=ペアA / 2行目=vs / 3行目=ペアB */}
+                        <div className={`${isLatest ? "text-blue-900" : ""} text-center`}>
+                          <p className={`${isLatest ? "text-xl font-bold" : ""}`}>{r.pairA.map((p: any) => displayName(p)).join("・")}</p>
+                          <p className={`my-0.5 font-bold ${isLatest ? "text-2xl" : "text-base"}`}>vs</p>
+                          <p className={`${isLatest ? "text-xl font-bold" : ""}`}>{r.pairB.map((p: any) => displayName(p)).join("・")}</p>
+                        </div>
+                        {r.rest.length > 0 && (
+                          <p
+                            className={`text-sm ${
+                              isLatest ? "text-blue-700" : "text-gray-700"
+                            }`}
+                          >
+                            休憩: {r.rest.map((p: any) => displayName(p)).join("・")}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* クリア確認モーダル（自前実装） */}
+          {confirmOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmOpen(false)} />
+              <div className={`relative z-10 w-[92%] max-w-sm rounded-xl ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} text-gray-900 p-4 shadow-xl border border-neutral-300`}>
+                <h3 className="text-base font-semibold mb-2">今日の状態を消去</h3>
+                <p className="text-sm text-gray-900 mb-4">
+                  本当に今日の状態を消去して新規開始しますか？<br/>
+                  ラウンド履歴・選択状態・離脱状態・重み設定が初期化されます。
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <Button type="button" className="!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100" onClick={() => setConfirmOpen(false)}>キャンセル</Button>
+                  <Button type="button" className="!bg-red-600 !text-white hover:!bg-red-700" onClick={doClearToday}>消去する</Button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
