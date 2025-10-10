@@ -843,9 +843,10 @@ export default function TennisAppPrototype() {
 
                 <Button
                   type="button"
-                  className={`w-auto shrink-0 font-semibold !border hover:!bg-neutral-100 shadow-sm ${
                   variant="outline"
-                  onClick={resetWeights}>
+                  className={`w-auto shrink-0 font-semibold !border hover:!bg-neutral-100 shadow-sm !bg-white !text-black !border-neutral-400`}
+                  onClick={resetWeights}
+                >
                   <span className="sm:hidden" aria-label="重みをデフォルトに戻す">重みを初期化</span>
                   <span className="hidden sm:inline">重みをデフォルトに戻す</span>
                 </Button>
@@ -864,7 +865,7 @@ export default function TennisAppPrototype() {
                 <Button
                   variant="outline"
                   onClick={() => setShowHelp((v) => !v)}
-                  className={`w-auto shrink-0 font-semibold !border shadow-sm whitespace-nowrap ${
+                  className={`w-auto shrink-0 font-semibold !border shadow-sm whitespace-nowrap !bg-white !text-black !border-neutral-400 hover:!bg-neutral-100`}
                 >
                   {showHelp ? "ヘルプを閉じる" : "ヘルプ"}
                 </Button>
