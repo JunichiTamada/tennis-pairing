@@ -8,6 +8,24 @@ import { Card, CardContent } from "@/components/ui/card";
 // ============================================================================
 const STORAGE_KEY = "tdoubles_state_v1";
 const PREF_KEY = "tdoubles_prefs_v1"; // 表示系プリファレンス（屋外モードなど）
+// アプリのバージョン表示用（設定カード右上）
+const APP_VERSION = "v1.0.0";
+
+// 初期登録メンバー（常にここが正として起動時に必ず反映される）
+const INITIAL_PARTICIPANTS = [
+  { id: 1, name: "浅野", gender: "男", selected: false, away: false, justReturned: false },
+  { id: 2, name: "加藤", gender: "男", selected: false, away: false, justReturned: false },
+  { id: 3, name: "奥山", gender: "男", selected: false, away: false, justReturned: false },
+  { id: 4, name: "大山", gender: "男", selected: false, away: false, justReturned: false },
+  { id: 5, name: "玉田", gender: "男", selected: false, away: false, justReturned: false },
+  { id: 6, name: "宮原ひろ", gender: "男", selected: false, away: false, justReturned: false },
+  { id: 7, name: "宮原む", gender: "女", selected: false, away: false, justReturned: false },
+  { id: 8, name: "根津", gender: "男", selected: false, away: false, justReturned: false },
+  { id: 9, name: "小柳", gender: "男", selected: false, away: false, justReturned: false },
+  { id: 10, name: "島村", gender: "男", selected: false, away: false, justReturned: false },
+  { id: 11, name: "伊豆丸", gender: "女", selected: false, away: false, justReturned: false },
+  { id: 12, name: "相原", gender: "女", selected: false, away: false, justReturned: false },
+];
 
 // ローカルタイムの YYYY-MM-DD を返す（UTCではなく端末ローカル）
 function todayStr() {
@@ -213,24 +231,37 @@ export default function TennisAppPrototype() {
     document.documentElement.classList.remove("dark");
   }, [outdoorMode]);
 
+  // 隠しコマンド：URL 末尾に #test で自己テスト（キーボードショートカットは廃止）
+  useEffect(() => {
+    if (location.hash === '#test') {
+      try { runSelfTests(); } catch {}
+    }
+  }, []);
+
   // --- 状態管理 -------------------------------------------------------------
-  const [participants, setParticipants] = useState([
-    { id: 1, name: "浅野", gender: "男", selected: false, away: false, justReturned: false },
-    { id: 2, name: "加藤", gender: "男", selected: false, away: false, justReturned: false },
-    { id: 3, name: "奥山", gender: "男", selected: false, away: false, justReturned: false },
-    { id: 4, name: "大山", gender: "男", selected: false, away: false, justReturned: false },
-    { id: 5, name: "玉田", gender: "男", selected: false, away: false, justReturned: false },
-    { id: 6, name: "宮原ひろ", gender: "男", selected: false, away: false, justReturned: false },
-    { id: 7, name: "宮原む", gender: "女", selected: false, away: false, justReturned: false },
-    { id: 8, name: "根津", gender: "男", selected: false, away: false, justReturned: false },
-    { id: 9, name: "小柳", gender: "男", selected: false, away: false, justReturned: false },
-    { id: 10, name: "島村", gender: "男", selected: false, away: false, justReturned: false },
-    { id: 11, name: "伊豆丸", gender: "女", selected: false, away: false, justReturned: false },
-  ]);
+  const [participants, setParticipants] = useState(INITIAL_PARTICIPANTS);
 
   const [rounds, setRounds] = useState<any[]>([]); // ラウンド履歴
   const [showHelp, setShowHelp] = useState(false); // ヘルプ表示フラグ
   const [testResults, setTestResults] = useState<string[]>([]); // 自己テスト結果
+  
+  // 隠しコマンド用：バージョン表示を 5 回タップで自己テスト起動（2 秒以内の連打）
+  const [verTapCount, setVerTapCount] = useState(0);
+  const verTapTimer = useRef<number | null>(null);
+  const onVersionTap = () => {
+    try { if (verTapTimer.current) window.clearTimeout(verTapTimer.current); } catch {}
+    setVerTapCount((c) => {
+      const n = c + 1;
+      if (n >= 5) {
+        try { runSelfTests(); } catch {}
+        return 0; // リセット
+      }
+      try {
+        verTapTimer.current = window.setTimeout(() => setVerTapCount(0), 2000) as unknown as number;
+      } catch {}
+      return n;
+    });
+  };
 
   // スコア重み（当日履歴全体に基づく）
   const [wPartner, setWPartner] = useState(2);
@@ -281,7 +312,27 @@ export default function TennisAppPrototype() {
       if (!raw) return;
       const saved = JSON.parse(raw);
       if (saved?.date === todayStr()) {
-        if (Array.isArray(saved.participants)) setParticipants(saved.participants);
+        // --- マイグレーション：保存された参加者に初期メンバーを必ず反映する ---
+        const restored: any[] = Array.isArray(saved.participants) ? [...saved.participants] : [];
+        const byId = new Map<number, any>(restored.map((p: any) => [p.id, { ...p }]));
+        // 初期メンバーを必ず存在させ、名前/性別の更新も反映
+        for (const base of INITIAL_PARTICIPANTS) {
+          const cur = byId.get(base.id);
+          if (cur) {
+            cur.name = base.name;      // 名前を最新に同期
+            cur.gender = base.gender;  // 性別も同期
+            // 型安全のため既存フラグを正規化
+            cur.selected = !!cur.selected;
+            cur.away = !!cur.away;
+            cur.justReturned = !!cur.justReturned && !!cur.selected;
+            byId.set(base.id, cur);
+          } else {
+            byId.set(base.id, { ...base });
+          }
+        }
+        // 既存に初期外のメンバー（将来の拡張やゲスト保存）があっても保持
+        const merged = Array.from(byId.values()).sort((a,b)=>a.id-b.id);
+        setParticipants(merged);
         if (Array.isArray(saved.rounds)) setRounds(saved.rounds);
         if (typeof saved.wPartner === "number") setWPartner(saved.wPartner);
         if (typeof saved.wOpp === "number") setWOpp(saved.wOpp);
@@ -341,9 +392,8 @@ export default function TennisAppPrototype() {
 
     // ラウンド・選択状態をリセットし、重みもデフォルトに戻す
     setRounds([]);
-    setParticipants((prev) =>
-      prev.map((p) => ({ ...p, selected: false, away: false, justReturned: false }))
-    );
+    // 初期メンバーに完全リセット
+    setParticipants(INITIAL_PARTICIPANTS.map((p) => ({ ...p })));
     setWPartner(2);
     setWOpp(1);
     setWPrev(1);
@@ -572,7 +622,7 @@ export default function TennisAppPrototype() {
   };
 
   // ========================================================================
-  // 簡易自己テスト（UIボタンで実行可能）
+  // 簡易自己テスト（UI非表示／隠しコマンドで実行）
   // ========================================================================
   function runSelfTests() {
     const results: string[] = [];
@@ -766,49 +816,76 @@ export default function TennisAppPrototype() {
           {/* 設定カード */}
           <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
             <CardContent className="p-4 space-y-3">
-              <h2 className="text-lg font-bold mb-3 text-black">設定</h2>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-black">設定</h2>
+                <span
+                  className="text-xs font-medium text-black/70 select-none"
+                  title="バージョンを5回タップで自己テスト"
+                  onClick={onVersionTap}
+                >
+                  {APP_VERSION}
+                </span>
+              </div>
+
+              {/* 上段：屋外モード + 重みリセット */}
               <div className="flex flex-wrap items-center gap-2">
-                {/* 屋外モードトグル：文言は固定、色で状態表示 */}
                 <Button
                   variant="outline"
-                  className={`whitespace-nowrap font-medium shadow-sm border ${
+                  className={`whitespace-nowrap font-semibold shadow-sm border ${
                     outdoorMode
                       ? "!bg-amber-400 !text-black !border-amber-500 hover:!bg-amber-500"
-                      : "!bg-white !text-black !border-neutral-400 hover:!bg-neutral-100"
+                      : "!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100"
                   }`}
                   onClick={() => setOutdoorMode((v) => !v)}
                 >
-                  屋外モード
+                  {`屋外モード: ${outdoorMode ? 'On' : 'Off'}`}
                 </Button>
 
-                {/* 自己テスト */}
-                <Button variant="outline" onClick={runSelfTests} className="font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm">
-                  自己テストを実行
+                <Button
+                  type="button"
+                  className={`w-full sm:w-auto font-semibold !border hover:!bg-neutral-100 shadow-sm ${
+                    outdoorMode ? "!bg-white !text-black !border-neutral-400" : "!bg-white !text-black !border-neutral-400"
+                  }`}
+                  variant="outline"
+                  onClick={resetWeights}
+                >
+                  重みをデフォルトに戻す
+                </Button>
+              </div>
+
+              {/* 下段：ヘルプ + 今日の状態を消去 */}
+              <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center text-sm gap-2">
+                <Button
+                  type="button"
+                  className="w-full sm:w-auto font-semibold !bg-red-600 !text-white hover:!bg-red-700 shadow-sm"
+                  onClick={clearToday}
+                >
+                  今日の状態を消去（新規開始）
                 </Button>
 
-                {/* ヘルプ */}
-                <Button variant="outline" onClick={() => setShowHelp((v) => !v)} className="font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm whitespace-nowrap">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowHelp((v) => !v)}
+                  className={`w-full sm:w-auto font-semibold !border shadow-sm whitespace-nowrap ${
+                    outdoorMode ? "!bg-white !text-black !border-neutral-400 hover:!bg-neutral-100" : "!bg-white !text-black !border-neutral-400 hover:!bg-neutral-100"
+                  }`}
+                >
                   {showHelp ? "ヘルプを閉じる" : "ヘルプ"}
                 </Button>
               </div>
 
-              {/* 操作 */}
-              <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end text-sm gap-2">
-                <Button type="button" className="w-full sm:w-auto font-medium !bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 shadow-sm" variant="outline" onClick={resetWeights}>
-                  重みをデフォルトに戻す
-                </Button>
-                <Button type="button" className="w-full sm:w-auto font-medium !bg-red-600 !text-white hover:!bg-red-700 shadow-sm" onClick={clearToday}>
-                  今日の状態を消去（新規開始）
-                </Button>
-              </div>
-
+              {/* 自己テスト結果（隠しコマンドで起動） */}
               {testResults.length > 0 && (
                 <div className="text-xs bg-gray-50 border border-neutral-300 rounded p-2 space-y-1">
                   <div className="flex items-center justify-between">
                     <p className="font-semibold m-0">Self-test results</p>
                     <Button
                       variant="ghost"
-                      className="h-6 px-2 text-xs"
+                      className={`h-6 px-2 text-xs rounded ${
+                        outdoorMode
+                          ? "!bg-black !text-white hover:!bg-neutral-800"
+                          : "!text-white hover:!bg-neutral-700 !border !border-white/30"
+                      }`}
                       onClick={() => setTestResults([])}
                     >
                       閉じる
@@ -918,7 +995,7 @@ export default function TennisAppPrototype() {
               <div>
                 <Button
                   size="sm"
-                  className={`w-full appearance-none !h-9 !py-2 ${
+                  className={`w-full appearance-none !h-9 !py-2 font-semibold ${
                     outdoorMode
                       ? "!bg-sky-600 !text-white hover:!bg-sky-700"
                       : "!bg-neutral-900 !text-white hover:!bg-neutral-800"
@@ -991,8 +1068,8 @@ export default function TennisAppPrototype() {
                   ラウンド履歴・選択状態・離脱状態・重み設定が初期化されます。
                 </p>
                 <div className="flex gap-2 justify-end">
-                  <Button type="button" className="!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100" onClick={() => setConfirmOpen(false)}>キャンセル</Button>
-                  <Button type="button" className="!bg-red-600 !text-white hover:!bg-red-700" onClick={doClearToday}>消去する</Button>
+                  <Button type="button" className="!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 font-semibold" onClick={() => setConfirmOpen(false)}>キャンセル</Button>
+                  <Button type="button" className="!bg-red-600 !text-white hover:!bg-red-700 font-semibold" onClick={doClearToday}>消去する</Button>
                 </div>
               </div>
             </div>
