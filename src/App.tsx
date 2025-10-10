@@ -828,10 +828,10 @@ export default function TennisAppPrototype() {
               </div>
 
               {/* 上段：屋外モード + 重みリセット */}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  className={`whitespace-nowrap font-semibold shadow-sm border ${
+                  className={`basis-1/2 min-w-0 truncate justify-center px-3 whitespace-nowrap font-semibold shadow-sm border ${
                     outdoorMode
                       ? "!bg-amber-400 !text-black !border-amber-500 hover:!bg-amber-500"
                       : "!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100"
@@ -844,7 +844,7 @@ export default function TennisAppPrototype() {
                 <Button
                   type="button"
                   variant="outline"
-                  className={`w-auto shrink-0 whitespace-nowrap font-semibold !border hover:!bg-neutral-100 shadow-sm !bg-white !text-black !border-neutral-400`}
+                  className={`basis-1/2 min-w-0 truncate justify-center px-3 w-auto shrink-0 whitespace-nowrap font-semibold !border hover:!bg-neutral-100 shadow-sm !bg-white !text-black !border-neutral-400`}
                   onClick={resetWeights}
                 >
                   <span className="sm:hidden" aria-label="重みをデフォルトに戻す">重みを初期化</span>
@@ -853,21 +853,21 @@ export default function TennisAppPrototype() {
               </div>
 
               {/* 下段：ヘルプ + 今日の状態を消去 */}
-              <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center text-sm gap-2">
-                <Button
-                  type="button"
-                  className="w-auto shrink-0 whitespace-nowrap font-semibold !bg-red-600 !text-white hover:!bg-red-700 shadow-sm"
-                  onClick={clearToday}>
-                  <span className="sm:hidden" aria-label="今日の状態を消去（新規開始）">今日の状態を消去</span>
-                  <span className="hidden sm:inline">今日の状態を消去（新規開始）</span>
-                </Button>
-
+              <div className="flex items-center text-sm gap-2">
                 <Button
                   variant="outline"
                   onClick={() => setShowHelp((v) => !v)}
-                  className={`w-auto shrink-0 font-semibold !border shadow-sm whitespace-nowrap !bg-white !text-black !border-neutral-400 hover:!bg-neutral-100`}
+                  className={`basis-1/2 min-w-0 truncate justify-center px-3 w-auto shrink-0 font-semibold !border shadow-sm whitespace-nowrap !bg-white !text-black !border-neutral-400 hover:!bg-neutral-100`}
                 >
                   {showHelp ? "ヘルプを閉じる" : "ヘルプ"}
+                </Button>
+
+                <Button
+                  type="button"
+                  className="basis-1/2 min-w-0 truncate justify-center px-3 w-auto shrink-0 whitespace-nowrap font-semibold !bg-red-600 !text-white hover:!bg-red-700 shadow-sm"
+                  onClick={clearToday}>
+                  <span className="sm:hidden" aria-label="今日の状態を消去（新規開始）">今日の状態を消去</span>
+                  <span className="hidden sm:inline">今日の状態を消去（新規開始）</span>
                 </Button>
               </div>
 
