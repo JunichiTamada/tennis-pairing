@@ -847,9 +847,9 @@ export default function TennisAppPrototype() {
                     outdoorMode ? "!bg-white !text-black !border-neutral-400" : "!bg-white !text-black !border-neutral-400"
                   }`}
                   variant="outline"
-                  onClick={resetWeights}
-                >
-                  重みをデフォルトに戻す
+                  onClick={resetWeights}>
+                  <span className="sm:hidden" aria-label="重みをデフォルトに戻す">重みを初期化</span>
+                  <span className="hidden sm:inline">重みをデフォルトに戻す</span>
                 </Button>
               </div>
 
@@ -858,9 +858,9 @@ export default function TennisAppPrototype() {
                 <Button
                   type="button"
                   className="w-full sm:w-auto font-semibold !bg-red-600 !text-white hover:!bg-red-700 shadow-sm"
-                  onClick={clearToday}
-                >
-                  今日の状態を消去（新規開始）
+                  onClick={clearToday}>
+                  <span className="sm:hidden" aria-label="今日の状態を消去（新規開始）">今日の状態を消去</span>
+                  <span className="hidden sm:inline">今日の状態を消去（新規開始）</span>
                 </Button>
 
                 <Button
