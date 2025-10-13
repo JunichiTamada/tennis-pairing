@@ -34,6 +34,7 @@ jobs:
         env:
           VITE_BASE_PATH: /tennis-pairing/v2-preview/
         run: |
+          npm ci
           npm run build
           # SPA対策：404.html を index.html のコピーに（GitHub Pages の直リンク/リロード対策）
           cp dist/index.html dist/404.html
