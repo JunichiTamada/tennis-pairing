@@ -1,4 +1,3 @@
-# .github/workflows/deploy-pages.yml
 name: Deploy Pages (root + v1 + v2-preview)
 
 on:
@@ -19,7 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # v2（このリポ）をチェックアウト
+      # v2（このリポ）
       - name: Checkout v2 (current repo)
         uses: actions/checkout@v4
 
@@ -50,13 +49,26 @@ jobs:
           mkdir -p dist-all/v2-preview
           cp -r dist/* dist-all/v2-preview/
 
-      # 3) v1 を“別リポ”から checkout
-      - name: Checkout v1 external repo
+      # 3) v1 を外部リポからチェックアウト（2段階フォールバック + 任意トークン）
+      - name: Try checkout v1 (release/v1)
+        id: co_v1_rel
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: JunichiTamada/tennis-pairing-v1   # ←正しい owner/repo を指定
+          ref: release/v1
+          path: repo-v1
+          token: ${{ secrets.V1_TOKEN }}                # Publicなら未設定でもOK
+
+      - name: Fallback checkout v1 (main)
+        id: co_v1_main
+        if: steps.co_v1_rel.outcome == 'failure'
         uses: actions/checkout@v4
         with:
-          repository: JunichiTamada/tennis-pairing-v1  # ★別リポ名
-          ref: release/v1                              # ★v1側のブランチ名
+          repository: JunichiTamada/tennis-pairing-v1
+          ref: main
           path: repo-v1
+          token: ${{ secrets.V1_TOKEN }}
 
       - name: Setup Node for v1
         uses: actions/setup-node@v4
@@ -80,7 +92,7 @@ jobs:
           mkdir -p dist-all/v1
           cp -r repo-v1/dist/* dist-all/v1/
 
-      # SPAの404フォールバック
+      # SPA 404 対応
       - name: Copy 404 fallbacks
         run: |
           cp dist-all/index.html dist-all/404.html
