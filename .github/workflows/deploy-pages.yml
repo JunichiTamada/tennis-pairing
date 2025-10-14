@@ -54,7 +54,7 @@ jobs:
       - name: Checkout v1 external repo
         uses: actions/checkout@v4
         with:
-          repository: junichitamada/tennis-pairing-v1  # ★別リポ名
+          repository: JunichiTamada/tennis-pairing-v1  # ★別リポ名
           ref: release/v1                              # ★v1側のブランチ名
           path: repo-v1
 
