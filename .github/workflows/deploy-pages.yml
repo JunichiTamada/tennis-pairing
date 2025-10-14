@@ -55,7 +55,7 @@ jobs:
         uses: actions/checkout@v4
         continue-on-error: true
         with:
-          repository: JunichiTamada/tennis-pairing-v1   # ←正しい owner/repo を指定
+          repository: JunichiTamada/tennis-pairing   # ←正しい owner/repo を指定
           ref: release/v1
           path: repo-v1
       - name: Fallback checkout v1 (main)
@@ -63,7 +63,7 @@ jobs:
         if: steps.co_v1_rel.outcome == 'failure'
         uses: actions/checkout@v4
         with:
-          repository: JunichiTamada/tennis-pairing-v1
+          repository: JunichiTamada/tennis-pairing
           ref: main
           path: repo-v1
       - name: Setup Node for v1
