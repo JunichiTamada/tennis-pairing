@@ -58,8 +58,6 @@ jobs:
           repository: JunichiTamada/tennis-pairing-v1   # ←正しい owner/repo を指定
           ref: release/v1
           path: repo-v1
-          token: ${{ secrets.V1_TOKEN }}                # Publicなら未設定でもOK
-
       - name: Fallback checkout v1 (main)
         id: co_v1_main
         if: steps.co_v1_rel.outcome == 'failure'
@@ -68,8 +66,6 @@ jobs:
           repository: JunichiTamada/tennis-pairing-v1
           ref: main
           path: repo-v1
-          token: ${{ secrets.V1_TOKEN }}
-
       - name: Setup Node for v1
         uses: actions/setup-node@v4
         with:
