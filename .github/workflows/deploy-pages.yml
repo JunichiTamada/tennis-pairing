@@ -1,0 +1,124 @@
+name: "Deploy Pages (aggregate: main + v1 + v2-preview)"
+
+on:
+  push:
+    branches:
+      - main
+      - v2
+      - release/v1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-aggregate"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      - name: Checkout v1 branch (release/v1)
+        uses: actions/checkout@v4
+        with:
+          ref: release/v1
+          path: v1
+        continue-on-error: true   # v1が無い場合はスキップ
+
+      - name: Checkout v2 branch
+        uses: actions/checkout@v4
+        with:
+          ref: v2
+          path: v2
+        continue-on-error: true   # v2が無い場合はスキップ
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            main/package-lock.json
+            v1/package-lock.json
+            v2/package-lock.json
+
+      # ---- build main (/tennis-pairing/) ----
+      - name: Install (main)
+        working-directory: main
+        run: npm ci
+      - name: Build main
+        working-directory: main
+        env:
+          VITE_BASE_PATH: /tennis-pairing/
+        run: |
+          npm run build
+          cp dist/index.html dist/404.html
+
+      # ---- build v1 (/tennis-pairing/v1/) ----
+      - name: Install (v1)
+        if: ${{ hashFiles('v1/package.json') != '' }}
+        working-directory: v1
+        run: npm ci
+      - name: Build v1
+        if: ${{ hashFiles('v1/package.json') != '' }}
+        working-directory: v1
+        env:
+          VITE_BASE_PATH: /tennis-pairing/v1/
+        run: |
+          npm run build
+          cp dist/index.html dist/404.html
+
+      # ---- build v2 (/tennis-pairing/v2-preview/) ----
+      - name: Install (v2)
+        if: ${{ hashFiles('v2/package.json') != '' }}
+        working-directory: v2
+        run: npm ci
+      - name: Build v2-preview
+        if: ${{ hashFiles('v2/package.json') != '' }}
+        working-directory: v2
+        env:
+          VITE_BASE_PATH: /tennis-pairing/v2-preview/
+        run: |
+          npm run build
+          cp dist/index.html dist/404.html
+
+      # ---- aggregate to one artifact ----
+      - name: Assemble site artifact
+        run: |
+          mkdir -p site
+          # ルート（main）
+          cp -r main/dist/* site/
+          # v1
+          if [ -d v1/dist ]; then
+            mkdir -p site/v1
+            cp -r v1/dist/* site/v1/
+          fi
+          # v2-preview
+          if [ -d v2/dist ]; then
+            mkdir -p site/v2-preview
+            cp -r v2/dist/* site/v2-preview/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
