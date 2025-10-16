@@ -1,12 +1,9 @@
-name: "Deploy Pages (aggregate: main + v1 + v2-preview)"
+name: Deploy Pages (root + v1 + v2-preview)
 
 on:
   push:
-    branches:
-      - main
-      - v2
-      - release/v1
-  workflow_dispatch:
+    branches: [ main, release/v2 ]
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -14,104 +11,79 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages-aggregate"
+  group: "pages"
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout main
+      # v2（このリポ）
+      - name: Checkout v2 (current repo)
         uses: actions/checkout@v4
-        with:
-          ref: main
-          path: main
-
-      - name: Checkout v1 branch (release/v1)
-        uses: actions/checkout@v4
-        with:
-          ref: release/v1
-          path: v1
-        continue-on-error: true   # v1が無い場合はスキップ
-
-      - name: Checkout v2 branch
-        uses: actions/checkout@v4
-        with:
-          ref: v2
-          path: v2
-        continue-on-error: true   # v2が無い場合はスキップ
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
-          cache-dependency-path: |
-            main/package-lock.json
-            v1/package-lock.json
-            v2/package-lock.json
 
-      # ---- build main (/tennis-pairing/) ----
-      - name: Install (main)
-        working-directory: main
+      - name: Install deps (v2)
         run: npm ci
-      - name: Build main
-        working-directory: main
-        env:
-          VITE_BASE_PATH: /tennis-pairing/
-        run: |
-          npm run build
-          cp dist/index.html dist/404.html
 
-      # ---- build v1 (/tennis-pairing/v1/) ----
-      - name: Install (v1)
-        if: ${{ hashFiles('v1/package.json') != '' }}
-        working-directory: v1
+      # 1) ルート（最新v2）
+      - name: Build root (v2 stable)
+        run: |
+          npm run build -- --base=/tennis-pairing/
+          mkdir -p dist-all
+          cp -r dist/* dist-all/
+
+      # 2) v2-preview（同一コードを別baseで）
+      - name: Build v2 preview (same code for now)
+        run: |
+          npm run build -- --base=/tennis-pairing/v2-preview/
+          mkdir -p dist-all/v2-preview
+          cp -r dist/* dist-all/v2-preview/
+
+      # 3) v1 を固定タグから **毎回** 取得してビルド（←ここを常時実行に）
+      - name: Checkout fixed v1 (pinned tag)
+        uses: actions/checkout@v4
+        with:
+          repository: JunichiTamada/tennis-pairing
+          ref: refs/tags/v1.0.0     # ← あなたのタグ名に合わせる
+          path: repo-v1
+
+      - name: Setup Node for v1
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: repo-v1/package-lock.json
+
+      - name: Install deps (v1)
+        working-directory: repo-v1
         run: npm ci
-      - name: Build v1
-        if: ${{ hashFiles('v1/package.json') != '' }}
-        working-directory: v1
-        env:
-          VITE_BASE_PATH: /tennis-pairing/v1/
-        run: |
-          npm run build
-          cp dist/index.html dist/404.html
 
-      # ---- build v2 (/tennis-pairing/v2-preview/) ----
-      - name: Install (v2)
-        if: ${{ hashFiles('v2/package.json') != '' }}
-        working-directory: v2
-        run: npm ci
-      - name: Build v2-preview
-        if: ${{ hashFiles('v2/package.json') != '' }}
-        working-directory: v2
-        env:
-          VITE_BASE_PATH: /tennis-pairing/v2-preview/
-        run: |
-          npm run build
-          cp dist/index.html dist/404.html
+      - name: Build v1 (force base for subpath)
+        working-directory: repo-v1
+        run: npm run build -- --base=/tennis-pairing/v1/
 
-      # ---- aggregate to one artifact ----
-      - name: Assemble site artifact
+      - name: Collect v1 artifacts
         run: |
-          mkdir -p site
-          # ルート（main）
-          cp -r main/dist/* site/
-          # v1
-          if [ -d v1/dist ]; then
-            mkdir -p site/v1
-            cp -r v1/dist/* site/v1/
-          fi
-          # v2-preview
-          if [ -d v2/dist ]; then
-            mkdir -p site/v2-preview
-            cp -r v2/dist/* site/v2-preview/
-          fi
+          mkdir -p dist-all/v1
+          cp -r repo-v1/dist/* dist-all/v1/
+
+      # SPA 404 対応（保険で全部 || true）
+      - name: Copy 404 fallbacks
+        run: |
+          cp dist-all/index.html dist-all/404.html || true
+          cp dist-all/v1/index.html dist-all/v1/404.html || true
+          cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html || true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: dist-all
 
   deploy:
     needs: build
