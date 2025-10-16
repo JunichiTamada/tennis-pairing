@@ -1,11 +1,12 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import path from 'node:path'
+import react from '@vitejs/plugin-react'        // or '@vitejs/plugin-react-swc'
+import tailwind from '@tailwindcss/vite'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
-  base: '/tennis-pairing/'
+  base: process.env.BASE_PATH || '/',           // CIで --base を渡すので '/' でOK
+  plugins: [react(), tailwind()],               // ★ v4 ではこれで十分
+  resolve: { alias: { '@': resolve(__dirname, 'src') } }
 })
