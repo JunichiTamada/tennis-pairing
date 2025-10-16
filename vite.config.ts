@@ -1,15 +1,12 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-// GitHub Pages で /<repo>/ または /<repo>/v1/ のように
-// サブパスへデプロイするため、環境変数から base を注入します。
-// Actions 側で BASE_PATH を設定（例: /tennis-pairing/, /tennis-pairing/v1/）
-const base = process.env.BASE_PATH || '/tennis-pairing/';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'        // or '@vitejs/plugin-react-swc'
+import tailwind from '@tailwindcss/vite'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
-  plugins: [react()],
-  base,
-  build: {
-    outDir: 'dist',
-  },
-});
+  base: process.env.BASE_PATH || '/',           // CIで --base を渡すので '/' でOK
+  plugins: [react(), tailwind()],               // ★ v4 ではこれで十分
+  resolve: { alias: { '@': resolve(__dirname, 'src') } }
+})
