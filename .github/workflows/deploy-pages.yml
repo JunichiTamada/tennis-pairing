@@ -50,7 +50,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: JunichiTamada/tennis-pairing
-          ref: refs/tags/v1.0.1     # ← あなたのタグ名に合わせる
+          ref: refs/tags/v1.0.0     # ← あなたのタグ名に合わせる
           path: repo-v1
 
       - name: Setup Node for v1
