@@ -99,7 +99,7 @@ button:focus-visible {
   }
 }
 @import "tailwindcss";
-@import "tailwindcss-animate";
+@plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
 
