@@ -3,7 +3,12 @@ name: Deploy Pages (root + v1 + v2-preview)
 on:
   push:
     branches: [ main, release/v2 ]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      build_v1:
+        type: boolean
+        default: false
+        description: "Rebuild v1? (通常はOFFで固定ビルド)"
 
 permissions:
   contents: read
@@ -45,26 +50,17 @@ jobs:
           mkdir -p dist-all/v2-preview
           cp -r dist/* dist-all/v2-preview/
 
-      # 3) v1 を外部リポからチェックアウト（2段階フォールバック）
-      - name: Try checkout v1 (release/v1)
-        id: co_v1_rel
-        uses: actions/checkout@v4
-        continue-on-error: true
-        with:
-          repository: JunichiTamada/tennis-pairing
-          ref: release/v1
-          path: repo-v1
-
-      - name: Fallback checkout v1 (main)
-        id: co_v1_main
-        if: steps.co_v1_rel.outcome == 'failure'
+      # 3) v1 固定コミットをチェックアウト
+      - name: Checkout fixed v1 (pinned tag)
+        if: ${{ inputs.build_v1 }}
         uses: actions/checkout@v4
         with:
           repository: JunichiTamada/tennis-pairing
-          ref: main
+          ref: refs/tags/v1.0.0   # ← ここをタグに
           path: repo-v1
 
       - name: Setup Node for v1
+        if: ${{ inputs.build_v1 }}
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -72,17 +68,28 @@ jobs:
           cache-dependency-path: repo-v1/package-lock.json
 
       - name: Install deps (v1)
+        if: ${{ inputs.build_v1 }}
         working-directory: repo-v1
         run: npm ci
 
-      - name: Build v1 (force base for subpath)
+      - name: Build v1 (fixed)
+        if: ${{ inputs.build_v1 }}
         working-directory: repo-v1
         run: npm run build -- --base=/tennis-pairing/v1/
 
       - name: Collect v1 artifacts
+        if: ${{ inputs.build_v1 }}
         run: |
           mkdir -p dist-all/v1
           cp -r repo-v1/dist/* dist-all/v1/
+
+      # v1をスキップする場合は、過去のdistを再利用
+      - name: Restore previous v1 artifacts
+        if: ${{ !inputs.build_v1 }}
+        run: |
+          echo "Reusing previous v1 content (no rebuild)."
+          mkdir -p dist-all/v1
+          # Pagesキャッシュには前回成果物が残るため空でOK
 
       # SPA 404 対応
       - name: Copy 404 fallbacks
