@@ -2,7 +2,7 @@ name: Deploy Pages (root + v1 + v2-preview)
 
 on:
   push:
-    branches: [ main, release/v2 ]
+    branches: [ main, release/v1, v2 ]
   workflow_dispatch: {}
 
 permissions:
@@ -18,69 +18,71 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # v2（このリポ）
-      - name: Checkout v2 (current repo)
+      # === 明示的に main を取る（ルート & v2-preview は main のコードでビルド）===
+      - name: "Checkout main (for root & v2-preview)"
         uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
 
-      - name: Setup Node
+      - name: "Setup Node (global cache)"
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: |
+            main/package-lock.json
+            repo-v1/package-lock.json
 
-      - name: Install deps (v2)
+      # --- root (/tennis-pairing/) from main ---
+      - name: "Install deps (root: main)"
+        working-directory: main
         run: npm ci
 
-      # 1) ルート（最新v2）
-      - name: Build root (v2 stable)
+      - name: "Build root (v2 stable on main)"
+        working-directory: main
         run: |
           npm run build -- --base=/tennis-pairing/
           mkdir -p dist-all
-          cp -r dist/* dist-all/
+          cp -r dist/* ../dist-all/
 
-      # 2) v2-preview（同一コードを別baseで）
-      - name: Build v2 preview (same code for now)
+      # --- v2-preview (/tennis-pairing/v2-preview/) from main ---
+      - name: "Build v2 preview (same code on main)"
+        working-directory: main
         run: |
           npm run build -- --base=/tennis-pairing/v2-preview/
-          mkdir -p dist-all/v2-preview
-          cp -r dist/* dist-all/v2-preview/
+          mkdir -p ../dist-all/v2-preview
+          cp -r dist/* ../dist-all/v2-preview/
 
-      # 3) v1 を固定タグから **毎回** 取得してビルド（←ここを常時実行に）
-      - name: Checkout fixed v1 (pinned tag)
+      # --- v1 をタグ固定で取得してビルド ---
+      - name: "Checkout fixed v1 (pinned tag)"
         uses: actions/checkout@v4
         with:
           repository: JunichiTamada/tennis-pairing
-          ref: refs/tags/v1.0.0     # ← あなたのタグ名に合わせる
+          ref: refs/tags/v1.0.0
           path: repo-v1
 
-      - name: Setup Node for v1
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: repo-v1/package-lock.json
-
-      - name: Install deps (v1)
+      - name: "Install deps (v1)"
         working-directory: repo-v1
         run: npm ci
 
-      - name: Build v1 (force base for subpath)
+      - name: "Build v1 (subpath base)"
         working-directory: repo-v1
         run: npm run build -- --base=/tennis-pairing/v1/
 
-      - name: Collect v1 artifacts
+      - name: "Collect v1 artifacts"
         run: |
           mkdir -p dist-all/v1
           cp -r repo-v1/dist/* dist-all/v1/
 
-      # SPA 404 対応（保険で全部 || true）
-      - name: Copy 404 fallbacks
+      # SPA 404 fallbacks
+      - name: "Copy 404 fallbacks"
         run: |
           cp dist-all/index.html dist-all/404.html || true
           cp dist-all/v1/index.html dist-all/v1/404.html || true
           cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html || true
 
-      - name: Upload artifact
+      - name: "Upload artifact"
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist-all
@@ -92,5 +94,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: "Configure Pages"
+        uses: actions/configure-pages@v5
       - id: deployment
         uses: actions/deploy-pages@v4
