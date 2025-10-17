@@ -43,7 +43,7 @@ jobs:
         working-directory: main
         run: |
           npm run build -- --base=/tennis-pairing/
-          mkdir -p dist-all
+          mkdir -p ../dist-all
           cp -r dist/* ../dist-all/
 
       # --- v2-preview (/tennis-pairing/v2-preview/) from main ---
