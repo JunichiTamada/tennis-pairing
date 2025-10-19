@@ -2,6 +2,13 @@
 
 GitHub Pages で公開している、**当日参加メンバーからダブルスの組み合わせを自動生成**するシングルページアプリ（SPA）です。
 
+## 📌 Stable v1 (with Undo)
+
+- Live: https://junichitamada.github.io/tennis-pairing/v1/
+- Branch: `release/v1`
+- Latest: **v1.1.0** (Undo support)
+- Changelog: https://github.com/JunichiTamada/tennis-pairing/releases/tag/v1.1.0
+
 * 公開URL: [https://junichitamada.github.io/tennis-pairing/](https://junichitamada.github.io/tennis-pairing/)
 * 推奨端末: **スマホ**（屋外での利用を想定）／PCブラウザでも可
 
