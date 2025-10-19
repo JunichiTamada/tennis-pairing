@@ -17,8 +17,12 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
+      # Pages 設定は build ジョブで先に行う
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
       # ========== 1) ルート(/) と v2-preview は main のコード ==========
       - name: Checkout main (for root & v2-preview)
         uses: actions/checkout@v4
@@ -35,6 +39,12 @@ jobs:
             main/package-lock.json
             repo-v1/package-lock.json
 
+      # dist-all をクリーンに用意
+      - name: Prepare dist-all
+        run: |
+          rm -rf dist-all
+          mkdir -p dist-all
+
       # ---- / (root) をビルド ----
       - name: Install deps (root)
         working-directory: main
@@ -45,7 +55,6 @@ jobs:
         run: |
           rm -rf dist
           npm run build -- --base=/tennis-pairing/
-          mkdir -p ../dist-all
           rsync -a --delete dist/ ../dist-all/
 
       # ---- /v2-preview をビルド（base を切替えて別ビルド）----
@@ -79,9 +88,9 @@ jobs:
       # ---- SPA 404 fallbacks（各配下に 404.html を設置）----
       - name: Add SPA 404 fallbacks
         run: |
-          cp dist-all/index.html dist-all/404.html || true
-          [ -f dist-all/v1/index.html ] && cp dist-all/v1/index.html dist-all/v1/404.html || true
-          [ -f dist-all/v2-preview/index.html ] && cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html || true
+          if [ -f dist-all/index.html ]; then cp dist-all/index.html dist-all/404.html; fi
+          if [ -f dist-all/v1/index.html ]; then cp dist-all/v1/index.html dist-all/v1/404.html; fi
+          if [ -f dist-all/v2-preview/index.html ]; then cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html; fi
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -95,7 +104,5 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
       - id: deployment
         uses: actions/deploy-pages@v4
