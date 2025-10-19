@@ -17,15 +17,16 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      # === ルート(/) と /v2-preview は main のソースでビルド ===
-      - name: "Checkout main (for root & v2-preview)"
+      # ========== 1) ルート(/) と v2-preview は main のコード ==========
+      - name: Checkout main (for root & v2-preview)
         uses: actions/checkout@v4
         with:
           ref: main
           path: main
 
-      - name: "Setup Node (global cache)"
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -34,54 +35,55 @@ jobs:
             main/package-lock.json
             repo-v1/package-lock.json
 
-      # --- root (/tennis-pairing/) from main ---
-      - name: "Install deps (root: main)"
+      # ---- / (root) をビルド ----
+      - name: Install deps (root)
         working-directory: main
         run: npm ci
 
-      - name: "Build root (v2 stable on main)"
+      - name: Build root (/tennis-pairing/)
         working-directory: main
         run: |
+          rm -rf dist
           npm run build -- --base=/tennis-pairing/
           mkdir -p ../dist-all
-          cp -r dist/* ../dist-all/
+          rsync -a --delete dist/ ../dist-all/
 
-      # --- v2-preview (/tennis-pairing/v2-preview/) from main ---
-      - name: "Build v2 preview (same code on main)"
+      # ---- /v2-preview をビルド（base を切替えて別ビルド）----
+      - name: Build v2-preview (/tennis-pairing/v2-preview/)
         working-directory: main
         run: |
+          rm -rf dist
           npm run build -- --base=/tennis-pairing/v2-preview/
           mkdir -p ../dist-all/v2-preview
-          cp -r dist/* ../dist-all/v2-preview/
+          rsync -a --delete dist/ ../dist-all/v2-preview/
 
-      # --- v1 は release/v1 ブランチから取得してビルド（←ここが肝） ---
-      - name: "Checkout v1 (from release/v1 branch)"
+      # ========== 2) v1 は release/v1 からビルド ==========
+      - name: Checkout v1 (from release/v1)
         uses: actions/checkout@v4
         with:
           ref: release/v1
           path: repo-v1
 
-      - name: "Install deps (v1)"
+      - name: Install deps (v1)
         working-directory: repo-v1
         run: npm ci
 
-      - name: "Build v1 (subpath base)"
+      - name: Build v1 (/tennis-pairing/v1/)
         working-directory: repo-v1
-        run: npm run build -- --base=/tennis-pairing/v1/
-
-      - name: "Collect v1 artifacts"
         run: |
-          mkdir -p dist-all/v1
-          cp -r repo-v1/dist/* dist-all/v1/
+          rm -rf dist
+          npm run build -- --base=/tennis-pairing/v1/
+          mkdir -p ../dist-all/v1
+          rsync -a --delete dist/ ../dist-all/v1/
 
-      # SPA 404 fallbacks
-      - name: "Copy 404 fallbacks"
+      # ---- SPA 404 fallbacks（各配下に 404.html を設置）----
+      - name: Add SPA 404 fallbacks
         run: |
           cp dist-all/index.html dist-all/404.html || true
-          cp dist-all/v1/index.html dist-all/v1/404.html || true
-          cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html || true
+          [ -f dist-all/v1/index.html ] && cp dist-all/v1/index.html dist-all/v1/404.html || true
+          [ -f dist-all/v2-preview/index.html ] && cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html || true
 
-      - name: "Upload artifact"
+      - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist-all
@@ -93,7 +95,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: "Configure Pages"
+      - name: Configure Pages
         uses: actions/configure-pages@v5
       - id: deployment
         uses: actions/deploy-pages@v4
