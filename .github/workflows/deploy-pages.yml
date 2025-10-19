@@ -18,7 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # === 明示的に main を取る（ルート & v2-preview は main のコードでビルド）===
+      # === ルート(/) と /v2-preview は main のソースでビルド ===
       - name: "Checkout main (for root & v2-preview)"
         uses: actions/checkout@v4
         with:
@@ -54,12 +54,11 @@ jobs:
           mkdir -p ../dist-all/v2-preview
           cp -r dist/* ../dist-all/v2-preview/
 
-      # --- v1 をタグ固定で取得してビルド ---
-      - name: "Checkout fixed v1 (pinned tag)"
+      # --- v1 は release/v1 ブランチから取得してビルド（←ここが肝） ---
+      - name: "Checkout v1 (from release/v1 branch)"
         uses: actions/checkout@v4
         with:
-          repository: JunichiTamada/tennis-pairing
-          ref: refs/tags/v1.0.0
+          ref: release/v1
           path: repo-v1
 
       - name: "Install deps (v1)"
