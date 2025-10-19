@@ -1,37 +1,67 @@
-// Undo/Redoの中核。Redoは今回は未使用だが拡張しやすい形に。
 import { useEffect, useRef, useState } from "react";
 
-export type Snapshot<T> = T;
+/**
+ * 変更前スナップショットを積むための、超シンプルな Undo スタック。
+ * - メモリ + localStorage のハイブリッド（ページ再読み込みでも残る）
+ * - push/pop 時に描画が更新される（version を更新）
+ */
+export function useHistoryStack<T>(key: string, max = 50) {
+  const stackRef = useRef<T[]>([]);
+  const initedRef = useRef(false);
+  const [version, setVersion] = useState(0); // UI更新用
 
-export function useHistoryStack<T>(key: string) {
-  const [history, setHistory] = useState<Snapshot<T>[]>([]);
-  const redoRef = useRef<Snapshot<T>[]>([]); // 将来Redo用
-
+  // 初回：localStorage から復元
   useEffect(() => {
-    const raw = localStorage.getItem(`${key}:history`);
-    if (raw) setHistory(JSON.parse(raw));
+    if (initedRef.current) return;
+    initedRef.current = true;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) stackRef.current = arr;
+      }
+    } catch {
+      // 失敗しても無視
+    }
+    // 読み込んだことを UI に反映
+    setVersion((v) => v + 1);
   }, [key]);
 
-  function push(snap: Snapshot<T>) {
-    setHistory(prev => {
-      const next = [...prev, snap];
-      localStorage.setItem(`${key}:history`, JSON.stringify(next));
-      redoRef.current = []; // 新規操作でRedoはクリア
-      return next;
-    });
-  }
+  const persist = () => {
+    try {
+      localStorage.setItem(key, JSON.stringify(stackRef.current));
+    } catch {
+      // 失敗しても致命的ではないので無視
+    }
+  };
 
-  function pop() {
-    let last: Snapshot<T> | undefined;
-    setHistory(prev => {
-      if (prev.length === 0) return prev;
-      const next = prev.slice(0, -1);
-      last = prev[prev.length - 1];
-      localStorage.setItem(`${key}:history`, JSON.stringify(next));
-      return next;
-    });
-    return last;
-  }
+  const push = (snap: T) => {
+    stackRef.current.push(snap);
+    if (stackRef.current.length > max) stackRef.current.shift();
+    persist();
+    setVersion((v) => v + 1); // UI 更新
+  };
 
-  return { history, push, pop };
+  const pop = (): T | null => {
+    if (stackRef.current.length === 0) return null;
+    const val = stackRef.current.pop() ?? null;
+    persist();
+    setVersion((v) => v + 1); // UI 更新
+    return val;
+  };
+
+  const clear = () => {
+    stackRef.current = [];
+    persist();
+    setVersion((v) => v + 1); // UI 更新
+  };
+
+  return {
+    history: stackRef.current,      // 参照用
+    canUndo: stackRef.current.length > 0,
+    push,
+    pop,
+    clear,
+    _v: version, // 外からは使わなくてOK（強制再描画トリガ）
+  };
 }

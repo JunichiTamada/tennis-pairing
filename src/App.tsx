@@ -9,10 +9,9 @@ import { Card, CardContent } from "@/components/ui/card";
 // ============================================================================
 const STORAGE_KEY = "tdoubles_state_v1";
 const PREF_KEY = "tdoubles_prefs_v1"; // 表示系プリファレンス（屋外モードなど）
-// アプリのバージョン表示用（設定カード右上）
 const APP_VERSION = "v1.1.0";
 
-// 初期登録メンバー（常にここが正として起動時に必ず反映される）
+// 初期登録メンバー
 const INITIAL_PARTICIPANTS = [
   { id: 1, name: "浅野", gender: "男", selected: false, away: false, justReturned: false },
   { id: 2, name: "加藤", gender: "男", selected: false, away: false, justReturned: false },
@@ -28,7 +27,7 @@ const INITIAL_PARTICIPANTS = [
   { id: 12, name: "相原", gender: "女", selected: false, away: false, justReturned: false },
 ];
 
-// ローカルタイムの YYYY-MM-DD を返す（UTCではなく端末ローカル）
+// ローカルタイムの YYYY-MM-DD
 function todayStr() {
   const d = new Date();
   const y = d.getFullYear();
@@ -47,19 +46,19 @@ function strToSeed(str: string) {
   return h >>> 0;
 }
 
-// 参照：mulberry32（シンプルで十分な擬似乱数）
+// mulberry32
 function mulberry32(a: number) {
   return function () {
     a |= 0;
     a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296; // [0,1)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
 
 // ============================================================================
-// ヘルパー関数群（組合せ生成・同一判定など）
+// ヘルパー（組合せ・判定）
 // ============================================================================
 function combinations(arr: any[], k: number) {
   const res: any[][] = [];
@@ -78,7 +77,6 @@ function combinations(arr: any[], k: number) {
   return res;
 }
 
-// 4人を2ペア×2に分けるパターンは3通り
 function pairingsOfFour([a, b, c, d]: any[]) {
   return [
     { pairA: [a, b], pairB: [c, d] },
@@ -87,14 +85,12 @@ function pairingsOfFour([a, b, c, d]: any[]) {
   ];
 }
 
-// {x,y} と {y,x} を同一ペアとして扱う
 function samePair(p1: any[], p2: any[]) {
   const ids1 = [p1[0].id, p1[1].id].sort();
   const ids2 = [p2[0].id, p2[1].id].sort();
   return ids1[0] === ids2[0] && ids1[1] === ids2[1];
 }
 
-// メンバー集合（idの集合）が等しいか
 function setEqualIds(a: any[], b: any[]) {
   const s1 = new Set(a.map((x) => x.id));
   const s2 = new Set(b.map((x) => x.id));
@@ -103,14 +99,12 @@ function setEqualIds(a: any[], b: any[]) {
   return true;
 }
 
-// ペア（id2つ）を一意に識別するキー（順不同）
 const key2 = (id1: number, id2: number) => {
   const a = Math.min(id1, id2);
   const b = Math.max(id1, id2);
   return `${a}-${b}`;
 };
 
-// 当日の履歴から「同一ペア回数」「個人vs個人の対戦回数」を集計
 function buildStats(rounds: any[]) {
   const partnerCount = new Map<string, number>();
   const opponentCount = new Map<string, number>();
@@ -119,14 +113,8 @@ function buildStats(rounds: any[]) {
     const [a1, a2] = r.pairA;
     const [b1, b2] = r.pairB;
 
-    partnerCount.set(
-      key2(a1.id, a2.id),
-      (partnerCount.get(key2(a1.id, a2.id)) || 0) + 1
-    );
-    partnerCount.set(
-      key2(b1.id, b2.id),
-      (partnerCount.get(key2(b1.id, b2.id)) || 0) + 1
-    );
+    partnerCount.set(key2(a1.id, a2.id), (partnerCount.get(key2(a1.id, a2.id)) || 0) + 1);
+    partnerCount.set(key2(b1.id, b2.id), (partnerCount.get(key2(b1.id, b2.id)) || 0) + 1);
 
     const oppPairs = [
       [a1.id, b1.id],
@@ -141,20 +129,16 @@ function buildStats(rounds: any[]) {
   return { partnerCount, opponentCount };
 }
 
-// 直前ラウンドと同じ4人構成で、ペアを反転しただけ（AB vs CD → BA vs DC）なら禁止
 function isForbiddenFlipGivenPrev(prev: any | null, candidate: any) {
   if (!prev) return false;
   const prevPlayers = [...prev.pairA, ...prev.pairB];
   const candPlayers = [...candidate.pairA, ...candidate.pairB];
   if (!setEqualIds(prevPlayers, candPlayers)) return false;
-  return (
-    samePair(candidate.pairA, prev.pairB) &&
-    samePair(candidate.pairB, prev.pairA)
-  );
+  return samePair(candidate.pairA, prev.pairB) && samePair(candidate.pairB, prev.pairA);
 }
 
 // ============================================================================
-// ヘルプ表示（重みの意味など）
+// ヘルプ
 // ============================================================================
 function HelpContent() {
   return (
@@ -162,15 +146,9 @@ function HelpContent() {
       <div className="space-y-3 text-sm leading-6">
         <p className="font-semibold">重みが結果に与える影響</p>
         <ul className="list-disc pl-5 space-y-1">
-          <li>
-            <strong>同一ペア重み (wPartner)</strong>：同じ2人の再ペアを避けたいほど値を上げる。
-          </li>
-          <li>
-            <strong>同一対戦重み (wOpp)</strong>：同じ相手と当たり続けるのを避けたいほど値を上げる。
-          </li>
-          <li>
-            <strong>直前類似ペナ (wPrev)</strong>：直前ラウンドと似た配置を避けたいほど値を上げる。
-          </li>
+          <li><strong>同一ペア重み (wPartner)</strong>：同じ2人の再ペアを避けたいほど値を上げる。</li>
+          <li><strong>同一対戦重み (wOpp)</strong>：同じ相手と当たり続けるのを避けたいほど値を上げる。</li>
+          <li><strong>直前類似ペナ (wPrev)</strong>：直前ラウンドと似た配置を避けたいほど値を上げる。</li>
         </ul>
         <p className="font-semibold">ハード制約</p>
         <ul className="list-disc pl-5 space-y-1">
@@ -179,8 +157,8 @@ function HelpContent() {
         </ul>
         <p className="font-semibold">補足</p>
         <ul className="list-disc pl-5 space-y-1">
-          <li>同じ参加者でも<strong>初回の組み合わせはランダムで変わります</strong>。</li>
-          <li>今日のラウンド履歴はアプリを閉じても<strong>自動的に保存</strong>されます。翌日になると自動で新しく始まります。やり直したいときは「今日の状態を消去」を押してください。</li>
+          <li>初回の組み合わせはランダム。</li>
+          <li>今日の履歴は自動保存・翌日は自動でリセット。「今日の状態を消去」でやり直し。</li>
         </ul>
       </div>
     </ErrorBoundary>
@@ -188,8 +166,8 @@ function HelpContent() {
 }
 
 // ============================================================================
-// メインコンポーネント
-// 予防線：ランタイム例外時に真っ白化を防ぐ簡易エラーバウンダリ
+// メイン & エラーバウンダリ
+// ============================================================================
 class ErrorBoundary extends React.Component<React.PropsWithChildren, { hasError: boolean; message: string }> {
   constructor(props: any) {
     super(props);
@@ -217,63 +195,54 @@ class ErrorBoundary extends React.Component<React.PropsWithChildren, { hasError:
   }
 }
 
-// ============================================================================
 export default function TennisAppPrototype() {
   // 屋外（高輝度）モード
   const [outdoorMode, setOutdoorMode] = useState(true);
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     document.documentElement.classList.remove("dark");
   }, [outdoorMode]);
 
-  // 隠しコマンド：URL末尾 #test で自己テスト
+  // 隠しコマンド：#test で自己テスト
   useEffect(() => {
-    if (location.hash === '#test') {
+    if (location.hash === "#test") {
       try { runSelfTests(); } catch {}
     }
   }, []);
 
-  // --- 状態管理 -------------------------------------------------------------
+  // 状態
   const [participants, setParticipants] = useState(INITIAL_PARTICIPANTS);
   const [rounds, setRounds] = useState<any[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [testResults, setTestResults] = useState<string[]>([]);
 
-  // --- Undo履歴管理（v1.1） ---
-  type AppSnapshot = {
-    participants: any[];
-    rounds: any[];
-  };
-  const { history, push, pop } = useHistoryStack<AppSnapshot>("undo_v1_1");
+  // Undo履歴
+  type AppSnapshot = { participants: any[]; rounds: any[]; };
+  const { history, push, pop, canUndo, clear: clearUndo } =
+    useHistoryStack<AppSnapshot>("undo_v1_1");
 
-  // 隠しコマンド用（バージョンタップ）
+  // バージョンタップ
   const [verTapCount, setVerTapCount] = useState(0);
   const verTapTimer = useRef<number | null>(null);
   const onVersionTap = () => {
     try { if (verTapTimer.current) window.clearTimeout(verTapTimer.current); } catch {}
     setVerTapCount((c) => {
       const n = c + 1;
-      if (n >= 5) {
-        try { runSelfTests(); } catch {}
-        return 0;
-      }
-      try {
-        verTapTimer.current = window.setTimeout(() => setVerTapCount(0), 2000) as unknown as number;
-      } catch {}
+      if (n >= 5) { try { runSelfTests(); } catch {}; return 0; }
+      try { verTapTimer.current = window.setTimeout(() => setVerTapCount(0), 2000) as unknown as number; } catch {}
       return n;
     });
   };
 
-  // スコア重み
+  // 重み
   const [wPartner, setWPartner] = useState(2);
   const [wOpp, setWOpp] = useState(1);
   const [wPrev, setWPrev] = useState(1);
 
-  // シード乱数（本日の日付で固定）
+  // シード乱数
   const randRef = useRef<() => number>(mulberry32(strToSeed(todayStr())));
 
-  // 長押し判定用
+  // 長押し
   const timers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const longPressFired = useRef<Record<number, boolean>>({});
   const LONG_PRESS_MS = 500;
@@ -287,15 +256,12 @@ export default function TennisAppPrototype() {
       const target = nextFrameRef.current || participantRef.current || latestRef.current;
       if (target) {
         const top = target.getBoundingClientRect().top + window.scrollY;
-        const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+        const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
         const isAndroidChrome = /Android/i.test(ua) && /Chrome/i.test(ua);
-        const behavior: ScrollBehavior = isAndroidChrome ? 'auto' : 'smooth';
+        const behavior: ScrollBehavior = isAndroidChrome ? "auto" : "smooth";
         requestAnimationFrame(() => {
-          try {
-            window.scrollTo({ top: Math.max(0, top - 8), behavior });
-          } catch {
-            window.scrollTo(0, Math.max(0, top - 8));
-          }
+          try { window.scrollTo({ top: Math.max(0, top - 8), behavior }); }
+          catch { window.scrollTo(0, Math.max(0, top - 8)); }
         });
       }
     }
@@ -303,7 +269,7 @@ export default function TennisAppPrototype() {
 
   const displayName = (p: { name: string }) => `${p.name}さん`;
 
-  // 起動時に localStorage から復元（本日データのみ）
+  // 復元（本日）
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -326,7 +292,7 @@ export default function TennisAppPrototype() {
             byId.set(base.id, { ...base });
           }
         }
-        const merged = Array.from(byId.values()).sort((a,b)=>a.id-b.id);
+        const merged = Array.from(byId.values()).sort((a, b) => a.id - b.id);
         setParticipants(merged);
         if (Array.isArray(saved.rounds)) setRounds(saved.rounds);
         if (typeof saved.wPartner === "number") setWPartner(saved.wPartner);
@@ -338,7 +304,7 @@ export default function TennisAppPrototype() {
     }
   }, []);
 
-  // 屋外モードの復元（起動時）
+  // 屋外モードの復元
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -353,48 +319,29 @@ export default function TennisAppPrototype() {
   // 自動保存
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const payload = {
-      date: todayStr(),
-      participants,
-      rounds,
-      wPartner,
-      wOpp,
-      wPrev,
-    };
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    } catch {}
+    const payload = { date: todayStr(), participants, rounds, wPartner, wOpp, wPrev };
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch {}
   }, [participants, rounds, wPartner, wOpp, wPrev]);
 
   // 屋外モードの保存
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(PREF_KEY, JSON.stringify({ outdoorMode }));
-    } catch {}
+    try { window.localStorage.setItem(PREF_KEY, JSON.stringify({ outdoorMode })); } catch {}
   }, [outdoorMode]);
 
-  // クリア系
+  // クリア
   const [confirmOpen, setConfirmOpen] = useState(false);
   const doClearToday = () => {
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage.removeItem(STORAGE_KEY);
-      }
-    } catch {}
+    try { if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY); } catch {}
     setRounds([]);
     setParticipants(INITIAL_PARTICIPANTS.map((p) => ({ ...p })));
-    setWPartner(2);
-    setWOpp(1);
-    setWPrev(1);
+    setWPartner(2); setWOpp(1); setWPrev(1);
     setConfirmOpen(false);
+    // Undo スタックも同時にクリアしておくと直感的です
+    clearUndo();
   };
   const clearToday = () => setConfirmOpen(true);
-  const resetWeights = () => {
-    setWPartner(2);
-    setWOpp(1);
-    setWPrev(1);
-  };
+  const resetWeights = () => { setWPartner(2); setWOpp(1); setWPrev(1); };
 
   // 参加者選択・一時離脱
   const toggleParticipant = (id: number) => {
@@ -402,16 +349,13 @@ export default function TennisAppPrototype() {
       prev.map((p) => {
         if (p.id !== id) return p;
         if (!p.selected) {
-          if (p.away) {
-            return { ...p, selected: true, away: false, justReturned: true };
-          }
+          if (p.away) return { ...p, selected: true, away: false, justReturned: true };
           return { ...p, selected: true, away: false, justReturned: p.justReturned };
         }
         return { ...p, selected: false, justReturned: false };
       })
     );
   };
-
   const toggleAway = (id: number) => {
     setParticipants((prev) =>
       prev.map((p) => {
@@ -439,7 +383,7 @@ export default function TennisAppPrototype() {
   };
   const endLongPress = (id: number) => clearTimeout(timers.current[id]);
 
-  // PC右クリックで一時離脱
+  // 右クリックで一時離脱
   const handleMouseDown = (id: number, e: any) => {
     if (e && e.type === "contextmenu") {
       e.preventDefault();
@@ -449,10 +393,7 @@ export default function TennisAppPrototype() {
   };
 
   const handleNameClick = (id: number) => {
-    if (longPressFired.current[id]) {
-      longPressFired.current[id] = false;
-      return;
-    }
+    if (longPressFired.current[id]) { longPressFired.current[id] = false; return; }
     toggleParticipant(id);
   };
 
@@ -460,10 +401,7 @@ export default function TennisAppPrototype() {
   const lastRound = () => rounds[rounds.length - 1];
 
   // 反転禁止
-  const isForbiddenFlip = (candidate: any) => {
-    const prev = lastRound();
-    return isForbiddenFlipGivenPrev(prev, candidate);
-  };
+  const isForbiddenFlip = (candidate: any) => isForbiddenFlipGivenPrev(lastRound(), candidate);
 
   // 直前類似ペナルティ
   const pairingPenaltyVsPrev = (candidate: any) => {
@@ -497,9 +435,8 @@ export default function TennisAppPrototype() {
       [a2.id, b1.id],
       [a2.id, b2.id],
     ];
-    for (const [x, y] of oppPairs) {
-      score += (opponentCount.get(key2(x, y)) || 0) * wOpp;
-    }
+    for (const [x, y] of oppPairs) score += (opponentCount.get(key2(x, y)) || 0) * wOpp;
+
     score += pairingPenaltyVsPrev(candidate);
 
     const prev = lastRound();
@@ -509,17 +446,14 @@ export default function TennisAppPrototype() {
     return score;
   };
 
-  // ラウンド生成（最小スコアの組合せを採用）＋ Undoスナップショット保存
+  // ラウンド生成（Undoスナップショット保存→採用）
   const generateRound = () => {
     try {
-      // 1) アクティブかつ選択中のみ抽出
+      // 候補プール
       let pool = participants.filter((p) => p.selected && !p.away);
-      if (pool.length < 4) {
-        alert("4名以上を選択してください");
-        return;
-      }
+      if (pool.length < 4) { alert("4名以上を選択してください"); return; }
 
-      // 2) 並び替え：復帰者を最優先、直前休みは後方へ
+      // 復帰者優先・直前休み後方
       const prev = lastRound();
       const lastRestIds = new Set(prev ? prev.rest.map((x: any) => x.id) : []);
       pool = [...pool].sort((a, b) => {
@@ -530,14 +464,11 @@ export default function TennisAppPrototype() {
         return aLastRest - bLastRest;
       });
 
-      // 3) 当日履歴の集計
       const counts = buildStats(rounds);
-
-      // 4) 候補評価
       const quads = combinations(pool, 4).slice(0, 200);
+
       let bestScore = Number.POSITIVE_INFINITY;
       let bestCandidates: any[] = [];
-
       for (const quad of quads) {
         const quadIds = new Set(quad.map((x) => x.id));
         const rest = pool.filter((p) => !quadIds.has(p.id));
@@ -545,49 +476,39 @@ export default function TennisAppPrototype() {
           if (isForbiddenFlip(pairing)) continue;
           const score = scoreByHistory(pairing, rest, counts);
           if (score < bestScore - 1e-9) {
-            bestScore = score;
-            bestCandidates = [{ match: { ...pairing, rest }, score }];
+            bestScore = score; bestCandidates = [{ match: { ...pairing, rest }, score }];
           } else if (Math.abs(score - bestScore) <= 1e-9) {
             bestCandidates.push({ match: { ...pairing, rest }, score });
           }
         }
       }
-
-      if (bestCandidates.length === 0) {
-        alert("候補が見つかりません。休憩者や選択を調整してください。");
-        return;
-      }
+      if (bestCandidates.length === 0) { alert("候補が見つかりません。休憩者や選択を調整してください。"); return; }
 
       const idx = Math.floor(randRef.current() * bestCandidates.length);
       const chosen = bestCandidates[idx];
 
-      // ★ Undoスナップショット保存（変更前）
+      // ★ 変更前スナップショットを保存（Undo用）
       push({
         participants: structuredClone(participants),
         rounds: structuredClone(rounds),
       });
 
-      // 5) 採用＆状態更新（復帰フラグを消費）
+      // 採用
       setRounds((prevRounds) => [...prevRounds, chosen.match]);
-      const chosenIds = new Set(
-        [...chosen.match.pairA, ...chosen.match.pairB].map((c: any) => c.id)
-      );
+      const chosenIds = new Set([...chosen.match.pairA, ...chosen.match.pairB].map((c: any) => c.id));
       setParticipants((prevParts) =>
         prevParts.map((p) => (chosenIds.has(p.id) ? { ...p, justReturned: false } : p))
       );
     } catch (e) {
-      try { console.error('generateRound error:', e); } catch {}
-      alert('エラーが発生しました。ページを再読み込みしてください。');
+      try { console.error("generateRound error:", e); } catch {}
+      alert("エラーが発生しました。ページを再読み込みしてください。");
     }
   };
 
-  // Undo（直前ラウンド取消）
+  // Undo
   const undoLastRound = () => {
     const snap = pop();
-    if (!snap) {
-      alert("取り消すラウンドがありません。");
-      return;
-    }
+    if (!snap) { alert("取り消すラウンドがありません。"); return; }
     setParticipants(snap.participants);
     setRounds(snap.rounds);
     try {
@@ -595,15 +516,13 @@ export default function TennisAppPrototype() {
         date: todayStr(),
         participants: snap.participants,
         rounds: snap.rounds,
-        wPartner,
-        wOpp,
-        wPrev
+        wPartner, wOpp, wPrev
       }));
     } catch {}
   };
 
   // ========================================================================
-  // 簡易自己テスト（UI非表示／隠しコマンドで実行）
+  // 自己テスト
   // ========================================================================
   function runSelfTests() {
     const results: string[] = [];
@@ -637,7 +556,7 @@ export default function TennisAppPrototype() {
       const sNew = scoreByHistory(candidateNew as any, [], counts);
       results.push(`[T9] repeat pairing scored higher: ${sRepeat > sNew}`);
       const noHistCounts = buildStats([]);
-      const four = [{ id: 1 },{ id: 2 },{ id: 3 },{ id: 4 }];
+      const four = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
       const bestScores = pairingsOfFour(four as any).map((p) => scoreByHistory(p as any, [], noHistCounts));
       const min = Math.min(...bestScores);
       const ties = bestScores.filter((s) => Math.abs(s - min) <= 1e-9).length;
@@ -655,10 +574,10 @@ export default function TennisAppPrototype() {
       const prev2 = { pairA: [{ id: 5 }, { id: 6 }], pairB: [{ id: 7 }, { id: 8 }], rest: [] };
       const candWithDifferentSet = { pairA: [{ id: 1 }, { id: 2 }], pairB: [{ id: 3 }, { id: 4 }] };
       results.push(`[T14] flip rule disabled for different 4 players: ${isForbiddenFlipGivenPrev(prev2, candWithDifferentSet) === false}`);
-      results.push(`[T15] key2 order-insensitive: ${key2(2,5) === key2(5,2)}`);
+      results.push(`[T15] key2 order-insensitive: ${key2(2, 5) === key2(5, 2)}`);
       const candAny = { pairA: [{ id: 1 }, { id: 2 }], pairB: [{ id: 3 }, { id: 4 }] };
       results.push(`[T16] flip check with null prev: ${isForbiddenFlipGivenPrev(null, candAny) === false}`);
-      results.push(`[T17] setEqualIds size mismatch: ${setEqualIds([{id:1}], [{id:1},{id:2}]) === false}`);
+      results.push(`[T17] setEqualIds size mismatch: ${setEqualIds([{ id: 1 }], [{ id: 1 }, { id: 2 }]) === false}`);
       const uniq = new Set(pairingsOfFour(dummy).map((p) =>
         [key2(p.pairA[0].id, p.pairA[1].id), key2(p.pairB[0].id, p.pairB[1].id)].sort().join("|")
       ));
@@ -674,18 +593,14 @@ export default function TennisAppPrototype() {
   // ========================================================================
   return (
     <ErrorBoundary>
-      <div className={`min-h-screen ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} text-gray-900`}>
+      <div className={`min-h-screen ${outdoorMode ? "bg-white" : "bg-neutral-500"} text-gray-900`}>
         <div className="p-4 max-w-md mx-auto space-y-6">
           {/* 設定カード */}
-          <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
+          <Card className={`border border-neutral-300 ${outdoorMode ? "bg-white" : "bg-neutral-500"} shadow-sm`}>
             <CardContent className="p-4 space-y-3">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-black">設定</h2>
-                <span
-                  className="text-xs font-medium text-black/70 select-none"
-                  title="バージョンを5回タップで自己テスト"
-                  onClick={onVersionTap}
-                >
+                <span className="text-xs font-medium text-black/70 select-none" title="バージョンを5回タップで自己テスト" onClick={onVersionTap}>
                   {APP_VERSION}
                 </span>
               </div>
@@ -695,13 +610,11 @@ export default function TennisAppPrototype() {
                 <Button
                   variant="outline"
                   className={`basis-1/2 min-w-0 truncate justify-center px-3 whitespace-nowrap font-semibold shadow-sm border ${
-                    outdoorMode
-                      ? "!bg-amber-400 !text-black !border-amber-500 hover:!bg-amber-500"
-                      : "!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100"
+                    outdoorMode ? "!bg-amber-400 !text-black !border-amber-500 hover:!bg-amber-500" : "!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100"
                   }`}
                   onClick={() => setOutdoorMode((v) => !v)}
                 >
-                  {`屋外モード: ${outdoorMode ? 'On' : 'Off'}`}
+                  {`屋外モード: ${outdoorMode ? "On" : "Off"}`}
                 </Button>
 
                 <Button
@@ -728,13 +641,14 @@ export default function TennisAppPrototype() {
                 <Button
                   type="button"
                   className="basis-1/2 min-w-0 truncate justify-center px-3 w-auto shrink-0 whitespace-nowrap font-semibold !bg-red-600 !text-white hover:!bg-red-700 shadow-sm"
-                  onClick={clearToday}>
+                  onClick={clearToday}
+                >
                   <span className="sm:hidden" aria-label="今日の状態を消去（新規開始）">今日の状態を消去</span>
                   <span className="hidden sm:inline">今日の状態を消去（新規開始）</span>
                 </Button>
               </div>
 
-              {/* 自己テスト結果（隠しコマンドで起動） */}
+              {/* 自己テスト結果 */}
               {testResults.length > 0 && (
                 <div className="text-xs bg-gray-50 border border-neutral-300 rounded p-2 space-y-1">
                   <div className="flex items-center justify-between">
@@ -742,9 +656,7 @@ export default function TennisAppPrototype() {
                     <Button
                       variant="ghost"
                       className={`h-6 px-2 text-xs rounded ${
-                        outdoorMode
-                          ? "!bg-black !text-white hover:!bg-neutral-800"
-                          : "!text-white hover:!bg-neutral-700 !border !border-white/30"
+                        outdoorMode ? "!bg-black !text-white hover:!bg-neutral-800" : "!text-white hover:!bg-neutral-700 !border !border-white/30"
                       }`}
                       onClick={() => setTestResults([])}
                     >
@@ -752,15 +664,13 @@ export default function TennisAppPrototype() {
                     </Button>
                   </div>
                   <ul className="list-disc pl-5 mt-1">
-                    {testResults.map((t, i) => (
-                      <li key={i}>{t}</li>
-                    ))}
+                    {testResults.map((t, i) => (<li key={i}>{t}</li>))}
                   </ul>
                 </div>
               )}
 
               {showHelp && (
-                <div className={`mt-2 p-3 rounded-lg border border-neutral-300 ${outdoorMode ? 'bg-white/90' : 'bg-neutral-500/90'}`}>
+                <div className={`mt-2 p-3 rounded-lg border border-neutral-300 ${outdoorMode ? "bg-white/90" : "bg-neutral-500/90"}`}>
                   <HelpContent />
                 </div>
               )}
@@ -769,41 +679,17 @@ export default function TennisAppPrototype() {
               <div className="text-sm grid grid-cols-1 gap-3">
                 <label className="flex items-center gap-3 text-black">
                   <span className="w-40 text-black">同一ペア重み</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={5}
-                    step={1}
-                    value={wPartner}
-                    onChange={(e) => setWPartner(Number(e.target.value))}
-                    className="flex-1 accent-blue-700"
-                  />
+                  <input type="range" min={0} max={5} step={1} value={wPartner} onChange={(e) => setWPartner(Number(e.target.value))} className="flex-1 accent-blue-700" />
                   <span className="w-8 text-right text-black">{wPartner}</span>
                 </label>
                 <label className="flex items-center gap-3 text-black">
                   <span className="w-40 text-black">同一対戦重み</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={5}
-                    step={1}
-                    value={wOpp}
-                    onChange={(e) => setWOpp(Number(e.target.value))}
-                    className="flex-1 accent-blue-700"
-                  />
+                  <input type="range" min={0} max={5} step={1} value={wOpp} onChange={(e) => setWOpp(Number(e.target.value))} className="flex-1 accent-blue-700" />
                   <span className="w-8 text-right text-black">{wOpp}</span>
                 </label>
                 <label className="flex items-center gap-3 text-black">
                   <span className="w-40 text-black">直前類似ペナ</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={5}
-                    step={1}
-                    value={wPrev}
-                    onChange={(e) => setWPrev(Number(e.target.value))}
-                    className="flex-1 accent-blue-700"
-                  />
+                  <input type="range" min={0} max={5} step={1} value={wPrev} onChange={(e) => setWPrev(Number(e.target.value))} className="flex-1 accent-blue-700" />
                   <span className="w-8 text-right text-black">{wPrev}</span>
                 </label>
               </div>
@@ -811,7 +697,7 @@ export default function TennisAppPrototype() {
           </Card>
 
           {/* 参加者選択 */}
-          <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
+          <Card className={`border border-neutral-300 ${outdoorMode ? "bg-white" : "bg-neutral-500"} shadow-sm`}>
             <CardContent className="p-4">
               <h2 ref={participantRef} className="text-lg font-bold mb-2">参加者を選択</h2>
               <div className="flex flex-wrap gap-2">
@@ -825,54 +711,38 @@ export default function TennisAppPrototype() {
                     onTouchCancel={() => endLongPress(p.id)}
                     className={`appearance-none px-3 py-2 rounded-full border text-sm flex items-center gap-1 ${
                       p.away
-                        ? (outdoorMode
-                            ? "!bg-yellow-400 !text-black !border-yellow-500"
-                            : "!bg-yellow-300 !text-black !border !border-yellow-500 font-semibold")
+                        ? (outdoorMode ? "!bg-yellow-400 !text-black !border-yellow-500" : "!bg-yellow-300 !text-black !border !border-yellow-500 font-semibold")
                         : p.selected
                         ? (outdoorMode ? "!bg-sky-600 !text-white !border-sky-700" : "!bg-black !text-neutral-200 !border !border-black font-semibold")
-                        : (outdoorMode
-                            ? "!bg-white !text-black !border !border-neutral-300 shadow-sm"
-                            : "!bg-white !text-black !border !border-neutral-300 shadow-sm")
+                        : (outdoorMode ? "!bg-white !text-black !border !border-neutral-300 shadow-sm" : "!bg-white !text-black !border !border-neutral-300 shadow-sm")
                     }`}
                   >
                     {displayName(p)}
                     {p.away && <span className="text-xs font-semibold text-red-700">(離脱中)</span>}
-                    {p.justReturned && !p.away && (
-                      <span className="text-[10px] ml-1">★復帰</span>
-                    )}
+                    {p.justReturned && !p.away && (<span className="text-[10px] ml-1">★復帰</span>)}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-gray-900 mt-2">
-                ヒント：タップ=選択/解除・長押し=一時離脱（スマホ）・右クリック=一時離脱（PC）
-              </p>
+              <p className="text-xs text-gray-900 mt-2">ヒント：タップ=選択/解除・長押し=一時離脱（スマホ）・右クリック=一時離脱（PC）</p>
             </CardContent>
           </Card>
 
-          {/* 次ラウンド決定（Undoボタンを横並びに） */}
-          <Card ref={nextFrameRef} className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
+          {/* 次ラウンド決定 + Undo */}
+          <Card ref={nextFrameRef} className={`border border-neutral-300 ${outdoorMode ? "bg-white" : "bg-neutral-500"} shadow-sm`}>
             <CardContent className="!p-2">
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  className={`flex-1 appearance-none !h-9 !py-2 font-semibold ${
-                    outdoorMode
-                      ? "!bg-sky-600 !text-white hover:!bg-sky-700"
-                      : "!bg-neutral-900 !text-white hover:!bg-neutral-800"
-                  }`}
+                  className={`flex-1 appearance-none !h-9 !py-2 font-semibold ${outdoorMode ? "!bg-sky-600 !text-white hover:!bg-sky-700" : "!bg-neutral-900 !text-white hover:!bg-neutral-800"}`}
                   onClick={generateRound}
                 >
                   次のペアを決める
                 </Button>
                 <Button
                   size="sm"
-                  className={`flex-1 !h-9 !py-2 font-semibold ${
-                    outdoorMode
-                      ? "!bg-gray-300 hover:!bg-gray-400 !text-black"
-                      : "!bg-neutral-700 hover:!bg-neutral-600 !text-white"
-                  }`}
+                  className={`flex-1 !h-9 !py-2 font-semibold ${outdoorMode ? "!bg-gray-300 hover:!bg-gray-400 !text-black" : "!bg-neutral-700 hover:!bg-neutral-600 !text-white"}`}
                   onClick={undoLastRound}
-                  disabled={history.length === 0}
+                  disabled={!canUndo}
                 >
                   直前ラウンドを取り消す
                 </Button>
@@ -880,38 +750,31 @@ export default function TennisAppPrototype() {
             </CardContent>
           </Card>
 
-          {/* ラウンド履歴（最新を上に表示） */}
+          {/* ラウンド履歴 */}
           {rounds.length > 0 && (
-            <Card className={`border border-neutral-300 ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} shadow-sm`}>
+            <Card className={`border border-neutral-300 ${outdoorMode ? "bg-white" : "bg-neutral-500"} shadow-sm`}>
               <CardContent className="p-4">
                 <h2 className="text-lg font-bold mb-2">ラウンド履歴</h2>
-                {rounds
-                  .map((r, idx) => ({ r, idx }))
-                  .reverse()
-                  .map(({ r, idx }) => {
-                    const isLatest = idx === rounds.length - 1;
-                    return (
-                      <div
-                        ref={isLatest ? latestRef : undefined}
-                        key={idx}
-                        className={`mb-3 ${isLatest ? "bg-blue-50 border-l-4 border-blue-500 p-2 rounded" : ""}`}
-                      >
-                        <p className={`font-semibold ${isLatest ? "text-lg text-blue-800" : ""}`}>
-                          第{idx + 1}ラウンド {isLatest && "(最新)"}
-                        </p>
-                        <div className={`${isLatest ? "text-blue-900" : ""} text-center`}>
-                          <p className={`${isLatest ? "text-xl font-bold" : ""}`}>{r.pairA.map((p: any) => displayName(p)).join("・")}</p>
-                          <p className={`my-0.5 font-bold ${isLatest ? "text-2xl" : "text-base"}`}>vs</p>
-                          <p className={`${isLatest ? "text-xl font-bold" : ""}`}>{r.pairB.map((p: any) => displayName(p)).join("・")}</p>
-                        </div>
-                        {r.rest.length > 0 && (
-                          <p className={`text-sm ${isLatest ? "text-blue-700" : "text-gray-700"}`}>
-                            休憩: {r.rest.map((p: any) => displayName(p)).join("・")}
-                          </p>
-                        )}
+                {rounds.map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => {
+                  const isLatest = idx === rounds.length - 1;
+                  return (
+                    <div ref={isLatest ? latestRef : undefined} key={idx} className={`mb-3 ${isLatest ? "bg-blue-50 border-l-4 border-blue-500 p-2 rounded" : ""}`}>
+                      <p className={`font-semibold ${isLatest ? "text-lg text-blue-800" : ""}`}>
+                        第{idx + 1}ラウンド {isLatest && "(最新)"}
+                      </p>
+                      <div className={`${isLatest ? "text-blue-900" : ""} text-center`}>
+                        <p className={`${isLatest ? "text-xl font-bold" : ""}`}>{r.pairA.map((p: any) => displayName(p)).join("・")}</p>
+                        <p className={`my-0.5 font-bold ${isLatest ? "text-2xl" : "text-base"}`}>vs</p>
+                        <p className={`${isLatest ? "text-xl font-bold" : ""}`}>{r.pairB.map((p: any) => displayName(p)).join("・")}</p>
                       </div>
-                    );
-                  })}
+                      {r.rest.length > 0 && (
+                        <p className={`text-sm ${isLatest ? "text-blue-700" : "text-gray-700"}`}>
+                          休憩: {r.rest.map((p: any) => displayName(p)).join("・")}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
           )}
@@ -920,10 +783,10 @@ export default function TennisAppPrototype() {
           {confirmOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center">
               <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmOpen(false)} />
-              <div className={`relative z-10 w-[92%] max-w-sm rounded-xl ${outdoorMode ? 'bg-white' : 'bg-neutral-500'} text-gray-900 p-4 shadow-xl border border-neutral-300`}>
+              <div className={`relative z-10 w-[92%] max-w-sm rounded-xl ${outdoorMode ? "bg-white" : "bg-neutral-500"} text-gray-900 p-4 shadow-xl border border-neutral-300`}>
                 <h3 className="text-base font-semibold mb-2">今日の状態を消去</h3>
                 <p className="text-sm text-gray-900 mb-4">
-                  本当に今日の状態を消去して新規開始しますか？<br/>
+                  本当に今日の状態を消去して新規開始しますか？<br />
                   ラウンド履歴・選択状態・離脱状態・重み設定が初期化されます。
                 </p>
                 <div className="flex gap-2 justify-end">
