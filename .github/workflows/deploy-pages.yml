@@ -18,12 +18,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # Pages 設定は build ジョブで先に行う
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@v5
 
-      # ========== 1) ルート(/) と v2-preview は main のコード ==========
       - name: Checkout main (for root & v2-preview)
         uses: actions/checkout@v4
         with:
@@ -39,13 +37,12 @@ jobs:
             main/package-lock.json
             repo-v1/package-lock.json
 
-      # dist-all をクリーンに用意
       - name: Prepare dist-all
         run: |
           rm -rf dist-all
           mkdir -p dist-all
 
-      # ---- / (root) をビルド ----
+      # ---- root ----
       - name: Install deps (root)
         working-directory: main
         run: npm ci
@@ -53,20 +50,18 @@ jobs:
       - name: Build root (/tennis-pairing/)
         working-directory: main
         run: |
-          rm -rf dist
           npm run build -- --base=/tennis-pairing/
           rsync -a --delete dist/ ../dist-all/
 
-      # ---- /v2-preview をビルド（base を切替えて別ビルド）----
+      # ---- v2-preview ----
       - name: Build v2-preview (/tennis-pairing/v2-preview/)
         working-directory: main
         run: |
-          rm -rf dist
           npm run build -- --base=/tennis-pairing/v2-preview/
           mkdir -p ../dist-all/v2-preview
           rsync -a --delete dist/ ../dist-all/v2-preview/
 
-      # ========== 2) v1 は release/v1 からビルド ==========
+      # ---- v1 ----
       - name: Checkout v1 (from release/v1)
         uses: actions/checkout@v4
         with:
@@ -80,17 +75,23 @@ jobs:
       - name: Build v1 (/tennis-pairing/v1/)
         working-directory: repo-v1
         run: |
-          rm -rf dist
           npm run build -- --base=/tennis-pairing/v1/
           mkdir -p ../dist-all/v1
           rsync -a --delete dist/ ../dist-all/v1/
 
-      # ---- SPA 404 fallbacks（各配下に 404.html を設置）----
+      # ---- SPA 404 fallback ----
       - name: Add SPA 404 fallbacks
         run: |
-          if [ -f dist-all/index.html ]; then cp dist-all/index.html dist-all/404.html; fi
-          if [ -f dist-all/v1/index.html ]; then cp dist-all/v1/index.html dist-all/v1/404.html; fi
-          if [ -f dist-all/v2-preview/index.html ]; then cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html; fi
+          [ -f dist-all/index.html ] && cp dist-all/index.html dist-all/404.html
+          [ -f dist-all/v1/index.html ] && cp dist-all/v1/index.html dist-all/v1/404.html
+          [ -f dist-all/v2-preview/index.html ] && cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html
+
+      # ---- Debug log ----
+      - name: Show dist-all structure
+        run: |
+          echo "========== dist-all content =========="
+          find dist-all -maxdepth 3 -type f | sort
+          echo "======================================"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
