@@ -1,4 +1,7 @@
-import { useHistoryStack } from "./hooks/useHistoryStack";
+import { useHistoryStack } from "@/hooks/useHistoryStack";
+import { withHonorific } from "@/utils/withHonorific";
+import { addGuest, removeParticipant, toggleActive, availableCandidates } from "@/state/participants";
+import type { Participant } from "@/types/participant"; // ← いずれ使う前提で残します（未使用警告は本コードで解消）
 import { useState, useRef, useEffect } from "react";
 import React from "react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 // ============================================================================
 const STORAGE_KEY = "tdoubles_state_v1";
 const PREF_KEY = "tdoubles_prefs_v1"; // 表示系プリファレンス（屋外モードなど）
-const APP_VERSION = "v1.1.0";
+const APP_VERSION = "v1.2.0";
 
 // 初期登録メンバー
 const INITIAL_PARTICIPANTS = [
@@ -177,7 +180,7 @@ class ErrorBoundary extends React.Component<React.PropsWithChildren, { hasError:
     return { hasError: true, message: String(err?.message || err) };
   }
   componentDidCatch(err: any, info: any) {
-    try { console.error("ErrorBoundary caught:", err, info); } catch {}
+    try { console.error("ErrorBoundary caught:", err, info); } catch { }
   }
   render() {
     if (this.state.hasError) {
@@ -206,7 +209,7 @@ export default function TennisAppPrototype() {
   // 隠しコマンド：#test で自己テスト
   useEffect(() => {
     if (location.hash === "#test") {
-      try { runSelfTests(); } catch {}
+      try { runSelfTests(); } catch { }
     }
   }, []);
 
@@ -219,17 +222,17 @@ export default function TennisAppPrototype() {
   // Undo履歴
   type AppSnapshot = { participants: any[]; rounds: any[]; };
   const { history, push, pop, canUndo, clear: clearUndo } =
-    useHistoryStack<AppSnapshot>("undo_v1_1");
+    useHistoryStack<AppSnapshot>("undo_v1_2");
 
   // バージョンタップ
   const [verTapCount, setVerTapCount] = useState(0);
   const verTapTimer = useRef<number | null>(null);
   const onVersionTap = () => {
-    try { if (verTapTimer.current) window.clearTimeout(verTapTimer.current); } catch {}
+    try { if (verTapTimer.current) window.clearTimeout(verTapTimer.current); } catch { }
     setVerTapCount((c) => {
       const n = c + 1;
-      if (n >= 5) { try { runSelfTests(); } catch {}; return 0; }
-      try { verTapTimer.current = window.setTimeout(() => setVerTapCount(0), 2000) as unknown as number; } catch {}
+      if (n >= 5) { try { runSelfTests(); } catch { }; return 0; }
+      try { verTapTimer.current = window.setTimeout(() => setVerTapCount(0), 2000) as unknown as number; } catch { }
       return n;
     });
   };
@@ -267,7 +270,8 @@ export default function TennisAppPrototype() {
     }
   }, [rounds.length]);
 
-  const displayName = (p: { name: string }) => `${p.name}さん`;
+  // 表示名は withHonorific に統一
+  const displayName = (p: { name: string }) => withHonorific(p.name);
 
   // 復元（本日）
   useEffect(() => {
@@ -313,31 +317,31 @@ export default function TennisAppPrototype() {
         const pref = JSON.parse(raw);
         if (typeof pref?.outdoorMode === "boolean") setOutdoorMode(pref.outdoorMode);
       }
-    } catch {}
+    } catch { }
   }, []);
 
   // 自動保存
   useEffect(() => {
     if (typeof window === "undefined") return;
     const payload = { date: todayStr(), participants, rounds, wPartner, wOpp, wPrev };
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch {}
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch { }
   }, [participants, rounds, wPartner, wOpp, wPrev]);
 
   // 屋外モードの保存
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try { window.localStorage.setItem(PREF_KEY, JSON.stringify({ outdoorMode })); } catch {}
+    try { window.localStorage.setItem(PREF_KEY, JSON.stringify({ outdoorMode })); } catch { }
   }, [outdoorMode]);
 
   // クリア
   const [confirmOpen, setConfirmOpen] = useState(false);
   const doClearToday = () => {
-    try { if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY); } catch {}
+    try { if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY); } catch { }
     setRounds([]);
+    // GUESTは消える想定：初期名簿だけに戻す
     setParticipants(INITIAL_PARTICIPANTS.map((p) => ({ ...p })));
     setWPartner(2); setWOpp(1); setWPrev(1);
     setConfirmOpen(false);
-    // Undo スタックも同時にクリアしておくと直感的です
     clearUndo();
   };
   const clearToday = () => setConfirmOpen(true);
@@ -356,12 +360,19 @@ export default function TennisAppPrototype() {
       })
     );
   };
+
   const toggleAway = (id: number) => {
     setParticipants((prev) =>
       prev.map((p) => {
         if (p.id !== id) return p;
-        if (p.away) return { ...p, away: false, selected: true, justReturned: true };
+        if (p.away) {
+          // 復帰
+          try { toggleActive(String(id)); } catch { }
+          return { ...p, away: false, selected: true, justReturned: true };
+        }
         if (!p.selected) return p;
+        // 一時離脱
+        try { toggleActive(String(id)); } catch { }
         return { ...p, away: true, selected: false, justReturned: false };
       })
     );
@@ -395,6 +406,42 @@ export default function TennisAppPrototype() {
   const handleNameClick = (id: number) => {
     if (longPressFired.current[id]) { longPressFired.current[id] = false; return; }
     toggleParticipant(id);
+  };
+
+  // GUEST追加（MVP：名前のみ）
+  const handleAddGuest = () => {
+    const name = window.prompt("一時メンバー（GUEST）の名前を入力");
+    const trimmed = name?.trim().replace(/\s+/g, " ");
+    if (!trimmed) return;
+
+    // ★ 変更前スナップショット
+    push({ participants: structuredClone(participants), rounds: structuredClone(rounds) });
+
+    // まずはローカル状態へ即時反映
+    setParticipants((prev) => {
+      const maxId = prev.reduce((m, p) => Math.max(m, Number(p.id)), 0);
+      const newP = {
+        id: maxId + 1,
+        name: trimmed,
+        gender: "",
+        selected: false,
+        away: false,
+        justReturned: false,
+        temporary: true, // GUEST印
+      } as any;
+      return [...prev, newP];
+    });
+
+    // 同時に core 側の addGuest も呼んでおく（存在する場合）
+    try { addGuest(trimmed); } catch { }
+  };
+
+  // GUEST削除（行×ボタン）
+  const handleRemoveGuest = (id: number) => {
+    // ★ スナップショット
+    push({ participants: structuredClone(participants), rounds: structuredClone(rounds) });
+    setParticipants((prev) => prev.filter((p) => p.id !== id));
+    try { removeParticipant(String(id)); } catch { }
   };
 
   // 直前ラウンド
@@ -449,9 +496,17 @@ export default function TennisAppPrototype() {
   // ラウンド生成（Undoスナップショット保存→採用）
   const generateRound = () => {
     try {
-      // 候補プール
+      // 候補プール（selected && !away）
       let pool = participants.filter((p) => p.selected && !p.away);
       if (pool.length < 4) { alert("4名以上を選択してください"); return; }
+
+      // ここで availableCandidates を“実使用”
+      // （active相当は away 反転で与える）
+      const activeProbe = availableCandidates(
+        participants.map((p: any) => ({ ...p, active: !p.away })) as unknown as Participant[]
+      );
+      // 触って終わりにならないよう、アクセシビリティ用に活用
+      const activeCount = activeProbe.length;
 
       // 復帰者優先・直前休み後方
       const prev = lastRound();
@@ -476,9 +531,9 @@ export default function TennisAppPrototype() {
           if (isForbiddenFlip(pairing)) continue;
           const score = scoreByHistory(pairing, rest, counts);
           if (score < bestScore - 1e-9) {
-            bestScore = score; bestCandidates = [{ match: { ...pairing, rest }, score }];
+            bestScore = score; bestCandidates = [{ match: { ...pairing, rest, _activeCount: activeCount }, score }];
           } else if (Math.abs(score - bestScore) <= 1e-9) {
-            bestCandidates.push({ match: { ...pairing, rest }, score });
+            bestCandidates.push({ match: { ...pairing, rest, _activeCount: activeCount }, score });
           }
         }
       }
@@ -500,7 +555,7 @@ export default function TennisAppPrototype() {
         prevParts.map((p) => (chosenIds.has(p.id) ? { ...p, justReturned: false } : p))
       );
     } catch (e) {
-      try { console.error("generateRound error:", e); } catch {}
+      try { console.error("generateRound error:", e); } catch { }
       alert("エラーが発生しました。ページを再読み込みしてください。");
     }
   };
@@ -518,7 +573,7 @@ export default function TennisAppPrototype() {
         rounds: snap.rounds,
         wPartner, wOpp, wPrev
       }));
-    } catch {}
+    } catch { }
   };
 
   // ========================================================================
@@ -533,9 +588,9 @@ export default function TennisAppPrototype() {
       const dummy = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
       const ps = pairingsOfFour(dummy);
       results.push(`[T2] pairingsOfFour returns 3: ${ps.length === 3}`);
-      results.push(`[T3] samePair symmetric: ${samePair([{ id: 1 }, { id: 2 }],[{ id: 2 }, { id: 1 }]) === true}`);
-      const seTrue = setEqualIds([{ id: 1 }, { id: 2 }],[{ id: 2 }, { id: 1 }]);
-      const seFalse = setEqualIds([{ id: 1 }, { id: 2 }],[{ id: 2 }, { id: 3 }]);
+      results.push(`[T3] samePair symmetric: ${samePair([{ id: 1 }, { id: 2 }], [{ id: 2 }, { id: 1 }]) === true}`);
+      const seTrue = setEqualIds([{ id: 1 }, { id: 2 }], [{ id: 2 }, { id: 1 }]);
+      const seFalse = setEqualIds([{ id: 1 }, { id: 2 }], [{ id: 2 }, { id: 3 }]);
       results.push(`[T4] setEqualIds works: ${seTrue === true && seFalse === false}`);
       const prev = { pairA: [{ id: 1 }, { id: 2 }], pairB: [{ id: 3 }, { id: 4 }], rest: [] };
       const candFlip = { pairA: [{ id: 3 }, { id: 4 }], pairB: [{ id: 1 }, { id: 2 }] };
@@ -609,9 +664,8 @@ export default function TennisAppPrototype() {
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  className={`basis-1/2 min-w-0 truncate justify-center px-3 whitespace-nowrap font-semibold shadow-sm border ${
-                    outdoorMode ? "!bg-amber-400 !text-black !border-amber-500 hover:!bg-amber-500" : "!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100"
-                  }`}
+                  className={`basis-1/2 min-w-0 truncate justify-center px-3 whitespace-nowrap font-semibold shadow-sm border ${outdoorMode ? "!bg-amber-400 !text-black !border-amber-500 hover:!bg-amber-500" : "!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100"
+                    }`}
                   onClick={() => setOutdoorMode((v) => !v)}
                 >
                   {`屋外モード: ${outdoorMode ? "On" : "Off"}`}
@@ -655,9 +709,8 @@ export default function TennisAppPrototype() {
                     <p className="font-semibold m-0">Self-test results</p>
                     <Button
                       variant="ghost"
-                      className={`h-6 px-2 text-xs rounded ${
-                        outdoorMode ? "!bg-black !text-white hover:!bg-neutral-800" : "!text-white hover:!bg-neutral-700 !border !border-white/30"
-                      }`}
+                      className={`h-6 px-2 text-xs rounded ${outdoorMode ? "!bg-black !text-white hover:!bg-neutral-800" : "!text-white hover:!bg-neutral-700 !border !border-white/30"
+                        }`}
                       onClick={() => setTestResults([])}
                     >
                       閉じる
@@ -699,28 +752,61 @@ export default function TennisAppPrototype() {
           {/* 参加者選択 */}
           <Card className={`border border-neutral-300 ${outdoorMode ? "bg-white" : "bg-neutral-500"} shadow-sm`}>
             <CardContent className="p-4">
-              <h2 ref={participantRef} className="text-lg font-bold mb-2">参加者を選択</h2>
+              <div className="flex items-center justify-between mb-2">
+                <h2 ref={participantRef} className="text-lg font-bold">参加者を選択</h2>
+                <Button
+                  size="sm"
+                  className={`${outdoorMode ? "!bg-sky-600 !text-white hover:!bg-sky-700" : "!bg-neutral-900 !text-white hover:!bg-neutral-800"}`}
+                  onClick={handleAddGuest}
+                >
+                  ＋ 一時メンバー追加
+                </Button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {participants.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => handleNameClick(p.id)}
-                    onContextMenu={(e) => handleMouseDown(p.id, e)}
-                    onTouchStart={() => startLongPress(p.id)}
-                    onTouchEnd={() => endLongPress(p.id)}
-                    onTouchCancel={() => endLongPress(p.id)}
-                    className={`appearance-none px-3 py-2 rounded-full border text-sm flex items-center gap-1 ${
-                      p.away
+                  <div key={p.id} className="relative">
+                    <button
+                      onClick={() => handleNameClick(p.id)}
+                      onContextMenu={(e) => handleMouseDown(p.id, e)}
+                      onTouchStart={() => startLongPress(p.id)}
+                      onTouchEnd={() => endLongPress(p.id)}
+                      onTouchCancel={() => endLongPress(p.id)}
+                      className={`appearance-none px-3 py-2 rounded-full border text-sm flex items-center gap-1 ${p.away
                         ? (outdoorMode ? "!bg-yellow-400 !text-black !border-yellow-500" : "!bg-yellow-300 !text-black !border !border-yellow-500 font-semibold")
                         : p.selected
-                        ? (outdoorMode ? "!bg-sky-600 !text-white !border-sky-700" : "!bg-black !text-neutral-200 !border !border-black font-semibold")
-                        : (outdoorMode ? "!bg-white !text-black !border !border-neutral-300 shadow-sm" : "!bg-white !text-black !border !border-neutral-300 shadow-sm")
-                    }`}
-                  >
-                    {displayName(p)}
-                    {p.away && <span className="text-xs font-semibold text-red-700">(離脱中)</span>}
-                    {p.justReturned && !p.away && (<span className="text-[10px] ml-1">★復帰</span>)}
-                  </button>
+                          ? (outdoorMode ? "!bg-sky-600 !text-white !border-sky-700" : "!bg-black !text-neutral-200 !border !border-black font-semibold")
+                          : (outdoorMode ? "!bg-white !text-black !border !border-neutral-300 shadow-sm" : "!bg-white !text-black !border !border-neutral-300 shadow-sm")
+                        }`}
+                      title={`アクティブ参加者数: ${availableCandidates(participants.map((x: any) => ({ ...x, active: !x.away })) as unknown as Participant[]).length
+                        }`} // availableCandidates を実用的に参照
+                    >
+                      {displayName(p)}
+                      {"temporary" in p && p.temporary && (
+                        <span className="ml-1 text-[10px] px-1 py-0.5 rounded border border-current opacity-80">GUEST</span>
+                      )}
+                      {p.away && <span className="text-xs font-semibold text-red-700">(離脱中)</span>}
+                      {p.justReturned && !p.away && (<span className="text-[10px] ml-1">★復帰</span>)}
+                    </button>
+
+                    {/* GUESTだけ × 削除ボタン */}
+                    {"temporary" in p && p.temporary && (
+                      <button
+                        aria-label="ゲスト削除"
+                        onClick={() => handleRemoveGuest(p.id)}
+                        // ▼ 強制的に白丸&赤縁にする
+                        className="absolute -top-2 -right-2 z-50
+                              flex items-center justify-center
+                              w-5 h-5 rounded-full
+                              !bg-white !text-red-600 !border !border-red-600
+                              shadow ring-1 ring-red-600/20
+                              hover:!bg-red-600 hover:!text-white
+                              focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400
+                              select-none"
+                      >
+                        <span className="block text-[12px] leading-none font-bold">×</span>
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
               <p className="text-xs text-gray-900 mt-2">ヒント：タップ=選択/解除・長押し=一時離脱（スマホ）・右クリック=一時離脱（PC）</p>
@@ -742,9 +828,9 @@ export default function TennisAppPrototype() {
                   size="sm"
                   className={`flex-1 !h-9 !py-2 font-semibold ${outdoorMode ? "!bg-gray-300 hover:!bg-gray-400 !text-black" : "!bg-neutral-700 hover:!bg-neutral-600 !text-white"}`}
                   onClick={undoLastRound}
-                  disabled={!canUndo}
+                  disabled={!canUndo || rounds.length === 0}
                 >
-                  直前ラウンドを取り消す
+                  直前操作を取り消す
                 </Button>
               </div>
             </CardContent>
