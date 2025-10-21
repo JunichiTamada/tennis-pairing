@@ -1,7 +1,7 @@
 import { useHistoryStack } from "@/hooks/useHistoryStack";
 import { withHonorific } from "@/utils/withHonorific";
 import { addGuest, removeParticipant, toggleActive, availableCandidates } from "@/state/participants";
-import type { Participant } from "@/types/participant"; // ← いずれ使う前提で残します（未使用警告は本コードで解消）
+import type { Participant } from "@/types/participant";
 import { useState, useRef, useEffect } from "react";
 import React from "react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 // ============================================================================
 const STORAGE_KEY = "tdoubles_state_v1";
 const PREF_KEY = "tdoubles_prefs_v1"; // 表示系プリファレンス（屋外モードなど）
-const APP_VERSION = "v1.2.0";
+const APP_VERSION = "v1.3.0";
 
 // 初期登録メンバー
 const INITIAL_PARTICIPANTS = [
@@ -58,6 +58,36 @@ function mulberry32(a: number) {
     t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+// ============================================================================
+// メイン & エラーバウンダリ（先に定義して依存順を明確化）
+// ============================================================================
+class ErrorBoundary extends React.Component<React.PropsWithChildren<{}>, { hasError: boolean; message: string }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, message: "" };
+  }
+  static getDerivedStateFromError(err: any) {
+    return { hasError: true, message: String(err?.message || err) };
+  }
+  componentDidCatch(err: any, info: any) {
+    try { console.error("ErrorBoundary caught:", err, info); } catch { /* noop */ }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 max-w-md mx-auto">
+          <div className="rounded border border-red-300 bg-red-50 text-red-900 p-3">
+            <p className="font-semibold mb-1">エラーが発生しました</p>
+            <p className="text-sm break-words">{this.state.message}</p>
+            <p className="text-xs text-red-800 mt-2">ページを再読み込みしてください。</p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children as any;
+  }
 }
 
 // ============================================================================
@@ -168,36 +198,6 @@ function HelpContent() {
   );
 }
 
-// ============================================================================
-// メイン & エラーバウンダリ
-// ============================================================================
-class ErrorBoundary extends React.Component<React.PropsWithChildren, { hasError: boolean; message: string }> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false, message: "" };
-  }
-  static getDerivedStateFromError(err: any) {
-    return { hasError: true, message: String(err?.message || err) };
-  }
-  componentDidCatch(err: any, info: any) {
-    try { console.error("ErrorBoundary caught:", err, info); } catch { }
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="p-4 max-w-md mx-auto">
-          <div className="rounded border border-red-300 bg-red-50 text-red-900 p-3">
-            <p className="font-semibold mb-1">エラーが発生しました</p>
-            <p className="text-sm break-words">{this.state.message}</p>
-            <p className="text-xs text-red-800 mt-2">ページを再読み込みしてください。</p>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children as any;
-  }
-}
-
 export default function TennisAppPrototype() {
   // 屋外（高輝度）モード
   const [outdoorMode, setOutdoorMode] = useState(true);
@@ -208,8 +208,8 @@ export default function TennisAppPrototype() {
 
   // 隠しコマンド：#test で自己テスト
   useEffect(() => {
-    if (location.hash === "#test") {
-      try { runSelfTests(); } catch { }
+    if (typeof location !== "undefined" && location.hash === "#test") {
+      try { runSelfTests(); } catch { /* noop */ }
     }
   }, []);
 
@@ -219,20 +219,20 @@ export default function TennisAppPrototype() {
   const [showHelp, setShowHelp] = useState(false);
   const [testResults, setTestResults] = useState<string[]>([]);
 
-  // Undo履歴
+  // Undo履歴（未使用変数を除去）
   type AppSnapshot = { participants: any[]; rounds: any[]; };
-  const { history, push, pop, canUndo, clear: clearUndo } =
+  const { push, pop, canUndo, clear: clearUndo } =
     useHistoryStack<AppSnapshot>("undo_v1_2");
 
-  // バージョンタップ
+  // バージョンタップ（5回で自己テスト起動）
   const [verTapCount, setVerTapCount] = useState(0);
   const verTapTimer = useRef<number | null>(null);
   const onVersionTap = () => {
-    try { if (verTapTimer.current) window.clearTimeout(verTapTimer.current); } catch { }
+    try { if (verTapTimer.current) window.clearTimeout(verTapTimer.current); } catch { /* noop */ }
     setVerTapCount((c) => {
       const n = c + 1;
-      if (n >= 5) { try { runSelfTests(); } catch { }; return 0; }
-      try { verTapTimer.current = window.setTimeout(() => setVerTapCount(0), 2000) as unknown as number; } catch { }
+      if (n >= 5) { try { runSelfTests(); } catch { /* noop */ }; return 0; }
+      try { verTapTimer.current = window.setTimeout(() => setVerTapCount(0), 2000) as unknown as number; } catch { /* noop */ }
       return n;
     });
   };
@@ -245,8 +245,8 @@ export default function TennisAppPrototype() {
   // シード乱数
   const randRef = useRef<() => number>(mulberry32(strToSeed(todayStr())));
 
-  // 長押し
-  const timers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  // 長押し（ブラウザでは setTimeout は number なので number を採用）
+  const timers = useRef<Record<number, number>>({});
   const longPressFired = useRef<Record<number, boolean>>({});
   const LONG_PRESS_MS = 500;
 
@@ -317,26 +317,26 @@ export default function TennisAppPrototype() {
         const pref = JSON.parse(raw);
         if (typeof pref?.outdoorMode === "boolean") setOutdoorMode(pref.outdoorMode);
       }
-    } catch { }
+    } catch { /* noop */ }
   }, []);
 
   // 自動保存
   useEffect(() => {
     if (typeof window === "undefined") return;
     const payload = { date: todayStr(), participants, rounds, wPartner, wOpp, wPrev };
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch { }
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch { /* noop */ }
   }, [participants, rounds, wPartner, wOpp, wPrev]);
 
   // 屋外モードの保存
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try { window.localStorage.setItem(PREF_KEY, JSON.stringify({ outdoorMode })); } catch { }
+    try { window.localStorage.setItem(PREF_KEY, JSON.stringify({ outdoorMode })); } catch { /* noop */ }
   }, [outdoorMode]);
 
   // クリア
   const [confirmOpen, setConfirmOpen] = useState(false);
   const doClearToday = () => {
-    try { if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY); } catch { }
+    try { if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
     setRounds([]);
     // GUESTは消える想定：初期名簿だけに戻す
     setParticipants(INITIAL_PARTICIPANTS.map((p) => ({ ...p })));
@@ -367,12 +367,12 @@ export default function TennisAppPrototype() {
         if (p.id !== id) return p;
         if (p.away) {
           // 復帰
-          try { toggleActive(String(id)); } catch { }
+          try { toggleActive(String(id)); } catch { /* noop */ }
           return { ...p, away: false, selected: true, justReturned: true };
         }
         if (!p.selected) return p;
         // 一時離脱
-        try { toggleActive(String(id)); } catch { }
+        try { toggleActive(String(id)); } catch { /* noop */ }
         return { ...p, away: true, selected: false, justReturned: false };
       })
     );
@@ -382,17 +382,19 @@ export default function TennisAppPrototype() {
     const target = participants.find((x) => x.id === id);
     if (!target || !target.selected) {
       longPressFired.current[id] = false;
-      clearTimeout(timers.current[id]);
+      if (timers.current[id]) clearTimeout(timers.current[id]);
       return;
     }
     longPressFired.current[id] = false;
-    clearTimeout(timers.current[id]);
-    timers.current[id] = setTimeout(() => {
+    if (timers.current[id]) clearTimeout(timers.current[id]);
+    timers.current[id] = window.setTimeout(() => {
       longPressFired.current[id] = true;
       toggleAway(id);
     }, LONG_PRESS_MS);
   };
-  const endLongPress = (id: number) => clearTimeout(timers.current[id]);
+  const endLongPress = (id: number) => {
+    if (timers.current[id]) clearTimeout(timers.current[id]);
+  };
 
   // 右クリックで一時離脱
   const handleMouseDown = (id: number, e: any) => {
@@ -407,17 +409,49 @@ export default function TennisAppPrototype() {
     if (longPressFired.current[id]) { longPressFired.current[id] = false; return; }
     toggleParticipant(id);
   };
+  // GUEST削除（行×ボタン）
+  const handleRemoveGuest = (id: number) => {
+    // ★ Undo スナップショット
+    push({ participants: structuredClone(participants), rounds: structuredClone(rounds) });
 
-  // GUEST追加（MVP：名前のみ）
-  const handleAddGuest = () => {
-    const name = window.prompt("一時メンバー（GUEST）の名前を入力");
-    const trimmed = name?.trim().replace(/\s+/g, " ");
+    setParticipants((prev) => prev.filter((p) => p.id !== id));
+
+    // core 側にも伝播（存在する場合）
+    try { removeParticipant(String(id)); } catch { /* noop */ }
+  };
+
+
+  // ===== GUEST追加モーダル =====
+  const [guestModalOpen, setGuestModalOpen] = useState(false);
+  const [guestNameInput, setGuestNameInput] = useState("");
+  const guestInputRef = useRef<HTMLInputElement | null>(null);
+
+  const openGuestModal = () => {
+    setGuestNameInput("");
+    setGuestModalOpen(true);
+    setTimeout(() => guestInputRef.current?.focus(), 0);
+  };
+  const closeGuestModal = () => setGuestModalOpen(false);
+
+  useEffect(() => {
+    if (!guestModalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter") { confirmAddGuest(); }
+      if (e.key === "Escape") { closeGuestModal(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // confirmAddGuest / closeGuestModal は安定参照（inline定義）なので依存に入れない
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guestModalOpen]);
+
+  const confirmAddGuest = () => {
+    const trimmed = guestNameInput.trim().replace(/\s+/g, " ");
     if (!trimmed) return;
 
     // ★ 変更前スナップショット
     push({ participants: structuredClone(participants), rounds: structuredClone(rounds) });
 
-    // まずはローカル状態へ即時反映
     setParticipants((prev) => {
       const maxId = prev.reduce((m, p) => Math.max(m, Number(p.id)), 0);
       const newP = {
@@ -432,17 +466,10 @@ export default function TennisAppPrototype() {
       return [...prev, newP];
     });
 
-    // 同時に core 側の addGuest も呼んでおく（存在する場合）
-    try { addGuest(trimmed); } catch { }
+    try { addGuest(trimmed); } catch { /* noop */ }
+    closeGuestModal();
   };
-
-  // GUEST削除（行×ボタン）
-  const handleRemoveGuest = (id: number) => {
-    // ★ スナップショット
-    push({ participants: structuredClone(participants), rounds: structuredClone(rounds) });
-    setParticipants((prev) => prev.filter((p) => p.id !== id));
-    try { removeParticipant(String(id)); } catch { }
-  };
+  // ============================
 
   // 直前ラウンド
   const lastRound = () => rounds[rounds.length - 1];
@@ -500,13 +527,11 @@ export default function TennisAppPrototype() {
       let pool = participants.filter((p) => p.selected && !p.away);
       if (pool.length < 4) { alert("4名以上を選択してください"); return; }
 
-      // ここで availableCandidates を“実使用”
-      // （active相当は away 反転で与える）
+      // availableCandidates の実用参照（active = !away）
       const activeProbe = availableCandidates(
         participants.map((p: any) => ({ ...p, active: !p.away })) as unknown as Participant[]
       );
-      // 触って終わりにならないよう、アクセシビリティ用に活用
-      const activeCount = activeProbe.length;
+      const activeCount = activeProbe.length; // アクセシビリティ（title 等）で利用
 
       // 復帰者優先・直前休み後方
       const prev = lastRound();
@@ -555,7 +580,7 @@ export default function TennisAppPrototype() {
         prevParts.map((p) => (chosenIds.has(p.id) ? { ...p, justReturned: false } : p))
       );
     } catch (e) {
-      try { console.error("generateRound error:", e); } catch { }
+      try { console.error("generateRound error:", e); } catch { /* noop */ }
       alert("エラーが発生しました。ページを再読み込みしてください。");
     }
   };
@@ -573,7 +598,7 @@ export default function TennisAppPrototype() {
         rounds: snap.rounds,
         wPartner, wOpp, wPrev
       }));
-    } catch { }
+    } catch { /* noop */ }
   };
 
   // ========================================================================
@@ -648,6 +673,22 @@ export default function TennisAppPrototype() {
   // ========================================================================
   return (
     <ErrorBoundary>
+      {/* 画面右上の固定バージョンバッジ（5タップで自己テスト） */}
+      <div className="fixed top-1 right-2 z-[1000] select-none">
+        <button
+          type="button"
+          title="バージョンを5回タップすると自己テストを実行します"
+          onClick={onVersionTap}
+          className={`px-2 py-[2px] rounded text-[11px] leading-none border shadow-sm
+            ${outdoorMode
+              ? "!bg-white !text-black !border-neutral-300 hover:!bg-neutral-100"
+              : "!bg-neutral-800 !text-white !border-neutral-600 hover:!bg-neutral-700"
+            }`}
+        >
+          {APP_VERSION}
+        </button>
+      </div>
+
       <div className={`min-h-screen ${outdoorMode ? "bg-white" : "bg-neutral-500"} text-gray-900`}>
         <div className="p-4 max-w-md mx-auto space-y-6">
           {/* 設定カード */}
@@ -655,7 +696,12 @@ export default function TennisAppPrototype() {
             <CardContent className="p-4 space-y-3">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-black">設定</h2>
-                <span className="text-xs font-medium text-black/70 select-none" title="バージョンを5回タップで自己テスト" onClick={onVersionTap}>
+                {/* 表示は維持（右上固定が主導線） */}
+                <span
+                  className="text-xs font-medium text-black/70 select-none cursor-pointer"
+                  title="バージョンを5回タップで自己テスト"
+                  onClick={onVersionTap}
+                >
                   {APP_VERSION}
                 </span>
               </div>
@@ -757,7 +803,7 @@ export default function TennisAppPrototype() {
                 <Button
                   size="sm"
                   className={`${outdoorMode ? "!bg-sky-600 !text-white hover:!bg-sky-700" : "!bg-neutral-900 !text-white hover:!bg-neutral-800"}`}
-                  onClick={handleAddGuest}
+                  onClick={openGuestModal}
                 >
                   ＋ 一時メンバー追加
                 </Button>
@@ -777,8 +823,7 @@ export default function TennisAppPrototype() {
                           ? (outdoorMode ? "!bg-sky-600 !text-white !border-sky-700" : "!bg-black !text-neutral-200 !border !border-black font-semibold")
                           : (outdoorMode ? "!bg-white !text-black !border !border-neutral-300 shadow-sm" : "!bg-white !text-black !border !border-neutral-300 shadow-sm")
                         }`}
-                      title={`アクティブ参加者数: ${availableCandidates(participants.map((x: any) => ({ ...x, active: !x.away })) as unknown as Participant[]).length
-                        }`} // availableCandidates を実用的に参照
+                      title={`アクティブ参加者数: ${availableCandidates(participants.map((x: any) => ({ ...x, active: !x.away })) as unknown as Participant[]).length}`}
                     >
                       {displayName(p)}
                       {"temporary" in p && p.temporary && (
@@ -793,15 +838,7 @@ export default function TennisAppPrototype() {
                       <button
                         aria-label="ゲスト削除"
                         onClick={() => handleRemoveGuest(p.id)}
-                        // ▼ 強制的に白丸&赤縁にする
-                        className="absolute -top-2 -right-2 z-50
-                              flex items-center justify-center
-                              w-5 h-5 rounded-full
-                              !bg-white !text-red-600 !border !border-red-600
-                              shadow ring-1 ring-red-600/20
-                              hover:!bg-red-600 hover:!text-white
-                              focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400
-                              select-none"
+                        className="absolute -top-2 -right-2 z-50 flex items-center justify-center w-5 h-5 rounded-full !bg-white !text-red-600 !border !border-red-600 shadow ring-1 ring-red-600/20 hover:!bg-red-600 hover:!text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 select-none"
                       >
                         <span className="block text-[12px] leading-none font-bold">×</span>
                       </button>
@@ -863,6 +900,48 @@ export default function TennisAppPrototype() {
                 })}
               </CardContent>
             </Card>
+          )}
+
+          {/* GUEST追加モーダル */}
+          {guestModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/40" onClick={closeGuestModal} />
+              <div className={`relative z-10 w-[92%] max-w-sm rounded-xl ${outdoorMode ? "bg-white" : "bg-neutral-500"} text-gray-900 p-4 shadow-xl border border-neutral-300`}>
+                <h3 className="text-base font-semibold mb-2">一時メンバー（GUEST）の追加</h3>
+                <label className="block text-sm text-gray-900 mb-2">
+                  名前
+                  <input
+                    ref={guestInputRef}
+                    type="text"
+                    inputMode="text"
+                    placeholder="例）山田太郎"
+                    value={guestNameInput}
+                    onChange={(e) => setGuestNameInput(e.target.value)}
+                    className={`mt-1 w-full rounded-md border px-3 py-2 text-sm
+                      ${outdoorMode ? "bg-white border-neutral-300" : "bg-white border-neutral-300"}
+                      focus:outline-none focus:ring-2 focus:ring-sky-500`}
+                  />
+                </label>
+                <p className="text-xs text-gray-700 mb-3">Enterで追加 / Escでキャンセルできます。</p>
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    type="button"
+                    className="!bg-white !text-black !border !border-neutral-400 hover:!bg-neutral-100 font-semibold"
+                    onClick={closeGuestModal}
+                  >
+                    キャンセル
+                  </Button>
+                  <Button
+                    type="button"
+                    className={`${outdoorMode ? "!bg-sky-600 hover:!bg-sky-700 !text-white" : "!bg-neutral-900 hover:!bg-neutral-800 !text-white"} font-semibold`}
+                    onClick={confirmAddGuest}
+                    disabled={!guestNameInput.trim()}
+                  >
+                    追加する
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* クリア確認モーダル */}
