@@ -673,22 +673,6 @@ export default function TennisAppPrototype() {
   // ========================================================================
   return (
     <ErrorBoundary>
-      {/* 画面右上の固定バージョンバッジ（5タップで自己テスト） */}
-      <div className="fixed top-1 right-2 z-[1000] select-none">
-        <button
-          type="button"
-          title="バージョンを5回タップすると自己テストを実行します"
-          onClick={onVersionTap}
-          className={`px-2 py-[2px] rounded text-[11px] leading-none border shadow-sm
-            ${outdoorMode
-              ? "!bg-white !text-black !border-neutral-300 hover:!bg-neutral-100"
-              : "!bg-neutral-800 !text-white !border-neutral-600 hover:!bg-neutral-700"
-            }`}
-        >
-          {APP_VERSION}
-        </button>
-      </div>
-
       <div className={`min-h-screen ${outdoorMode ? "bg-white" : "bg-neutral-500"} text-gray-900`}>
         <div className="p-4 max-w-md mx-auto space-y-6">
           {/* 設定カード */}
