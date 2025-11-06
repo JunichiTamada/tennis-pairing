@@ -101,10 +101,21 @@ jobs:
       # ---- SPA 404 fallback ----
       - name: Add SPA 404 fallbacks
         run: |
-          [ -f dist-all/index.html ] && cp dist-all/index.html dist-all/404.html
-          [ -f dist-all/v1/index.html ] && cp dist-all/v1/index.html dist-all/v1/404.html
-          [ -f dist-all/v1-hsbk/index.html ] && cp dist-all/v1-hsbk/index.html dist-all/v1-hsbk/404.html
-          [ -f dist-all/v2-preview/index.html ] && cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html
+          [ -f dist-all/index.html ] && cp dist-all/index.html dist-all/404.html || true
+          [ -f dist-all/v1/index.html ] && cp dist-all/v1/index.html dist-all/v1/404.html || true
+          [ -f dist-all/v1-hsbk/index.html ] && cp dist-all/v1-hsbk/index.html dist-all/v1-hsbk/404.html || true
+          [ -f dist-all/v2-preview/index.html ] && cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html || true
+
+      - name: Verify artifacts exists
+        run: |
+            test -f dist-all/index.html || (echo "root index.html missing" && exit 1)
+            test -f dist-all/v1/index.html || (echo "v1 index.html missing" && exit 1)
+            test -f dist-all/v2-preview/index.html || (echo "v2-preview index.html missing" && exit 1)
+            test -f dist-all/v1-hsbk/index.html || (echo "v1-hsbk index.html missing" && exit 1)
+            test -f dist-all/404.html || (echo "root 404.html missing" && exit 1)
+            test -f dist-all/v1/404.html || (echo "v1 404.html missing" && exit 1)
+            test -f dist-all/v2-preview/404.html || (echo "v2-preview 404.html missing" && exit 1)
+            test -f dist-all/v1-hsbk/404.html || (echo "v1-hsbk 404.html missing" && exit 1)
 
       # ---- Debug log ----
       - name: Show dist-all structure
