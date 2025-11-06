@@ -117,7 +117,27 @@ jobs:
             test -f dist-all/v2-preview/404.html || (echo "v2-preview 404.html missing" && exit 1)
             test -f dist-all/v1-hsbk/404.html || (echo "v1-hsbk 404.html missing" && exit 1)
 
-      # ---- Debug log ----
+      # ---- Verify JS assets (each app must have hashed bundles) ----
+      - name: Verify JS assets exist
+        run: |
+          ls -1 dist-all/assets 2>/dev/null || true
+          ls -1 dist-all/v1/assets 2>/dev/null || true
+          ls -1 dist-all/v1-hsbk/assets 2>/dev/null || true
+          ls -1 dist-all/v2-preview/assets 2>/dev/null || true
+          test -d dist-all/assets || echo "WARN: root assets/ missing"
+          test -d dist-all/v1/assets || echo "WARN: v1 assets/ missing"
+          test -d dist-all/v1-hsbk/assets || echo "WARN: v1-hsbk assets/ missing"
+          test -d dist-all/v2-preview/assets || echo "WARN: v2-preview assets/ missing"
+
+      # ---- Show <script> src lines to confirm base paths ----
+      - name: Show script src lines from index.html
+        run: |
+          echo "[root]";        grep -n '<script.*src=' dist-all/index.html            || true
+          echo "[v1]";          grep -n '<script.*src=' dist-all/v1/index.html         || true
+          echo "[v1-hsbk]";     grep -n '<script.*src=' dist-all/v1-hsbk/index.html    || true
+          echo "[v2-preview]";  grep -n '<script.*src=' dist-all/v2-preview/index.html || true
+
+            # ---- Debug log ----
       - name: Show dist-all structure
         run: |
           echo "========== dist-all content =========="
