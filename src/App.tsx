@@ -10,8 +10,30 @@ import { Card, CardContent } from "@/components/ui/card";
 // ============================================================================
 // ユーティリティ（日付・シード・永続化）
 // ============================================================================
-const STORAGE_KEY = "tdoubles_state_v1";
-const PREF_KEY = "tdoubles_prefs_v1"; // 表示系プリファレンス（屋外モードなど）
+
+// HSBK だけで変更（release/v1-hsbk）
+const GROUP_ID = "hsbk";
+type SavedState = { groupId: string; /* …既存の型… */ };
+
+function loadState(): SavedState | null {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    try {
+        const obj = JSON.parse(raw) as SavedState;
+        if (obj.groupId !== GROUP_ID) return null; // 混在防止
+        return obj;
+    } catch { return null; }
+}
+
+function saveState(state: Omit<SavedState, "groupId">) {
+    const obj: SavedState = { groupId: GROUP_ID, ...state };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+}
+
+// 既存：const STORAGE_KEY = "tdoubles_state_v1";
+// 既存：const PREF_KEY    = "tdoubles_prefs_v1";
+const STORAGE_KEY = `tdoubles_state_v1_${GROUP_ID}`;
+const PREF_KEY = `tdoubles_prefs_v1_${GROUP_ID}`;
 const APP_VERSION = "v1.3.0";
 
 // 初期登録メンバー
