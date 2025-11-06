@@ -67,6 +67,17 @@ jobs:
           rsync -a --delete dist-v2/ ../dist-all/v2-preview/
 
       # ---- v1 ----
+      - name: Checkout v1 (from release/v1)
+        uses: actions/checkout@v4
+        with:
+          ref: release/v1
+          path: repo-v1
+
+      - name: Verify repo-v1 exists
+        run: |
+          ls -la
+          test -d repo-v1 || (echo "ERROR: repo-v1 missing (checkout failed)" && exit 1)
+
       - name: Install deps (v1)
         working-directory: repo-v1
         run: npm ci
@@ -83,6 +94,17 @@ jobs:
           rsync -a --delete dist-v1/ ../dist-all/v1/
 
       # ---- v1-hsbk ----
+      - name: Checkout v1-hsbk (from release/v1-hsbk)
+        uses: actions/checkout@v4
+        with:
+          ref: release/v1-hsbk
+          path: repo-v1-hsbk
+
+      - name: Verify repo-v1-hsbk exists
+        run: |
+          ls -la
+          test -d repo-v1-hsbk || (echo "ERROR: repo-v1-hsbk missing (checkout failed)" && exit 1)
+
       - name: Install deps (v1-hsbk)
         working-directory: repo-v1-hsbk
         run: npm ci
