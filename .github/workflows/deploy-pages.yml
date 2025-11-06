@@ -44,59 +44,35 @@ jobs:
           mkdir -p dist-all
 
       # ---- root ----
-      - name: Install deps (root)
-        working-directory: main
-        run: npm ci
-
       - name: Build root (/tennis-pairing/)
         working-directory: main
         run: |
-          npm run build -- --base=/tennis-pairing/
-          rsync -a --delete dist/ ../dist-all/
+          npm run build -- --base=/tennis-pairing/ --outDir=dist-root
+          rsync -a --delete dist-root/ ../dist-all/
 
       # ---- v2-preview ----
       - name: Build v2-preview (/tennis-pairing/v2-preview/)
         working-directory: main
         run: |
-          npm run build -- --base=/tennis-pairing/v2-preview/
+          npm run build -- --base=/tennis-pairing/v2-preview/ --outDir=dist-v2
           mkdir -p ../dist-all/v2-preview
-          rsync -a --delete dist/ ../dist-all/v2-preview/
+          rsync -a --delete dist-v2/ ../dist-all/v2-preview/
 
       # ---- v1 ----
-      - name: Checkout v1 (from release/v1)
-        uses: actions/checkout@v4
-        with:
-          ref: release/v1
-          path: repo-v1
-
-      - name: Install deps (v1)
-        working-directory: repo-v1
-        run: npm ci
-
       - name: Build v1 (/tennis-pairing/v1/)
         working-directory: repo-v1
         run: |
-          npm run build -- --base=/tennis-pairing/v1/
+          npm run build -- --base=/tennis-pairing/v1/ --outDir=dist-v1
           mkdir -p ../dist-all/v1
-          rsync -a --delete dist/ ../dist-all/v1/
+          rsync -a --delete dist-v1/ ../dist-all/v1/
 
       # ---- v1-hsbk ----
-      - name: Checkout v1-hsbk (from release/v1-hsbk)
-        uses: actions/checkout@v4
-        with:
-          ref: release/v1-hsbk
-          path: repo-v1-hsbk
-
-      - name: Install deps (v1-hsbk)
-        working-directory: repo-v1-hsbk
-        run: npm ci
-
       - name: Build v1-hsbk (/tennis-pairing/v1-hsbk/)
         working-directory: repo-v1-hsbk
         run: |
-          npm run build -- --base=/tennis-pairing/v1-hsbk/
+          npm run build -- --base=/tennis-pairing/v1-hsbk/ --outDir=dist-hsbk
           mkdir -p ../dist-all/v1-hsbk
-          rsync -a --delete dist/ ../dist-all/v1-hsbk/
+          rsync -a --delete dist-hsbk/ ../dist-all/v1-hsbk/
 
       # ---- SPA 404 fallback ----
       - name: Add SPA 404 fallbacks
