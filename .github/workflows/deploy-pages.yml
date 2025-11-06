@@ -44,6 +44,14 @@ jobs:
           mkdir -p dist-all
 
       # ---- root ----
+      - name: Install deps (root)
+        working-directory: main
+        run: npm ci
+
+      - name: Add type deps (root)
+        working-directory: main
+        run: npm i -D @types/node
+
       - name: Build root (/tennis-pairing/)
         working-directory: main
         run: |
@@ -59,6 +67,14 @@ jobs:
           rsync -a --delete dist-v2/ ../dist-all/v2-preview/
 
       # ---- v1 ----
+      - name: Install deps (v1)
+        working-directory: repo-v1
+        run: npm ci
+
+      - name: Add type deps (v1)
+        working-directory: repo-v1
+        run: npm i -D @types/node
+
       - name: Build v1 (/tennis-pairing/v1/)
         working-directory: repo-v1
         run: |
@@ -67,6 +83,14 @@ jobs:
           rsync -a --delete dist-v1/ ../dist-all/v1/
 
       # ---- v1-hsbk ----
+      - name: Install deps (v1-hsbk)
+        working-directory: repo-v1-hsbk
+        run: npm ci
+
+      - name: Add type deps (v1-hsbk)
+        working-directory: repo-v1-hsbk
+        run: npm i -D @types/node
+
       - name: Build v1-hsbk (/tennis-pairing/v1-hsbk/)
         working-directory: repo-v1-hsbk
         run: |
