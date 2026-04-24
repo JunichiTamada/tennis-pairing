@@ -1,8 +1,8 @@
-name: Deploy Pages (root + v1 + v2-preview)
+name: Deploy Pages (root + v1 + v1-2courts + v2-preview)
 
 on:
   push:
-    branches: [ main, release/v1, v2 ]
+    branches: [ main, release/v1, v2, feature/round-8players ]
   workflow_dispatch: {}
 
 permissions:
@@ -36,6 +36,7 @@ jobs:
           cache-dependency-path: |
             main/package-lock.json
             repo-v1/package-lock.json
+            repo-v1-2courts/package-lock.json
 
       - name: Prepare dist-all
         run: |
@@ -79,11 +80,30 @@ jobs:
           mkdir -p ../dist-all/v1
           rsync -a --delete dist/ ../dist-all/v1/
 
+      # ---- v1-2courts ----
+      - name: Checkout v1-2courts (from feature/round-8players)
+        uses: actions/checkout@v4
+        with:
+          ref: feature/round-8players
+          path: repo-v1-2courts
+
+      - name: Install deps (v1-2courts)
+        working-directory: repo-v1-2courts
+        run: npm ci
+
+      - name: Build v1-2courts (/tennis-pairing/v1-2courts/)
+        working-directory: repo-v1-2courts
+        run: |
+          npm run build -- --base=/tennis-pairing/v1-2courts/
+          mkdir -p ../dist-all/v1-2courts
+          rsync -a --delete dist/ ../dist-all/v1-2courts/
+
       # ---- SPA 404 fallback ----
       - name: Add SPA 404 fallbacks
         run: |
           [ -f dist-all/index.html ] && cp dist-all/index.html dist-all/404.html
           [ -f dist-all/v1/index.html ] && cp dist-all/v1/index.html dist-all/v1/404.html
+          [ -f dist-all/v1-2courts/index.html ] && cp dist-all/v1-2courts/index.html dist-all/v1-2courts/404.html
           [ -f dist-all/v2-preview/index.html ] && cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html
 
       # ---- Debug log ----
