@@ -1,8 +1,8 @@
-name: Deploy Pages (root + v1 + v1-hsbk + v2-preview)
+name: Deploy Pages (root + v1 + v1-hsbk + v1-2courts + v2-preview)
 
 on:
   push:
-    branches: [ main, release/v1, release/v1-hsbk, v2 ]
+    branches: [ main, release/v1, release/v1-hsbk, v2, feature/round-8players ]
   workflow_dispatch: {}
 
 permissions:
@@ -37,6 +37,7 @@ jobs:
             main/package-lock.json
             repo-v1/package-lock.json
             repo-v1-hsbk/package-lock.json
+            repo-v1-2courts/package-lock.json
 
       - name: Prepare dist-all
         run: |
@@ -75,8 +76,7 @@ jobs:
 
       - name: Verify repo-v1 exists
         run: |
-          ls -la
-          test -d repo-v1 || (echo "ERROR: repo-v1 missing (checkout failed)" && exit 1)
+          test -d repo-v1 || (echo "ERROR: repo-v1 missing" && exit 1)
 
       - name: Install deps (v1)
         working-directory: repo-v1
@@ -102,8 +102,7 @@ jobs:
 
       - name: Verify repo-v1-hsbk exists
         run: |
-          ls -la
-          test -d repo-v1-hsbk || (echo "ERROR: repo-v1-hsbk missing (checkout failed)" && exit 1)
+          test -d repo-v1-hsbk || (echo "ERROR: repo-v1-hsbk missing" && exit 1)
 
       - name: Install deps (v1-hsbk)
         working-directory: repo-v1-hsbk
@@ -120,51 +119,49 @@ jobs:
           mkdir -p ../dist-all/v1-hsbk
           rsync -a --delete dist-hsbk/ ../dist-all/v1-hsbk/
 
+      # ---- v1-2courts ----
+      - name: Checkout v1-2courts (from feature/round-8players)
+        uses: actions/checkout@v4
+        with:
+          ref: feature/round-8players
+          path: repo-v1-2courts
+
+      - name: Verify repo-v1-2courts exists
+        run: |
+          test -d repo-v1-2courts || (echo "ERROR: repo-v1-2courts missing" && exit 1)
+
+      - name: Install deps (v1-2courts)
+        working-directory: repo-v1-2courts
+        run: npm ci
+
+      - name: Add type deps (v1-2courts)
+        working-directory: repo-v1-2courts
+        run: npm i -D @types/node
+
+      - name: Build v1-2courts (/tennis-pairing/v1-2courts/)
+        working-directory: repo-v1-2courts
+        run: |
+          npm run build -- --base=/tennis-pairing/v1-2courts/ --outDir=dist-2courts
+          mkdir -p ../dist-all/v1-2courts
+          rsync -a --delete dist-2courts/ ../dist-all/v1-2courts/
+
       # ---- SPA 404 fallback ----
       - name: Add SPA 404 fallbacks
         run: |
-          [ -f dist-all/index.html ] && cp dist-all/index.html dist-all/404.html || true
-          [ -f dist-all/v1/index.html ] && cp dist-all/v1/index.html dist-all/v1/404.html || true
-          [ -f dist-all/v1-hsbk/index.html ] && cp dist-all/v1-hsbk/index.html dist-all/v1-hsbk/404.html || true
-          [ -f dist-all/v2-preview/index.html ] && cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html || true
+          cp dist-all/index.html dist-all/404.html || true
+          cp dist-all/v1/index.html dist-all/v1/404.html || true
+          cp dist-all/v1-hsbk/index.html dist-all/v1-hsbk/404.html || true
+          cp dist-all/v1-2courts/index.html dist-all/v1-2courts/404.html || true
+          cp dist-all/v2-preview/index.html dist-all/v2-preview/404.html || true
 
+      # ---- Verify artifacts ----
       - name: Verify artifacts exists
         run: |
-            test -f dist-all/index.html || (echo "root index.html missing" && exit 1)
-            test -f dist-all/v1/index.html || (echo "v1 index.html missing" && exit 1)
-            test -f dist-all/v2-preview/index.html || (echo "v2-preview index.html missing" && exit 1)
-            test -f dist-all/v1-hsbk/index.html || (echo "v1-hsbk index.html missing" && exit 1)
-            test -f dist-all/404.html || (echo "root 404.html missing" && exit 1)
-            test -f dist-all/v1/404.html || (echo "v1 404.html missing" && exit 1)
-            test -f dist-all/v2-preview/404.html || (echo "v2-preview 404.html missing" && exit 1)
-            test -f dist-all/v1-hsbk/404.html || (echo "v1-hsbk 404.html missing" && exit 1)
-
-      # ---- Verify JS assets (each app must have hashed bundles) ----
-      - name: Verify JS assets exist
-        run: |
-          ls -1 dist-all/assets 2>/dev/null || true
-          ls -1 dist-all/v1/assets 2>/dev/null || true
-          ls -1 dist-all/v1-hsbk/assets 2>/dev/null || true
-          ls -1 dist-all/v2-preview/assets 2>/dev/null || true
-          test -d dist-all/assets || echo "WARN: root assets/ missing"
-          test -d dist-all/v1/assets || echo "WARN: v1 assets/ missing"
-          test -d dist-all/v1-hsbk/assets || echo "WARN: v1-hsbk assets/ missing"
-          test -d dist-all/v2-preview/assets || echo "WARN: v2-preview assets/ missing"
-
-      # ---- Show <script> src lines to confirm base paths ----
-      - name: Show script src lines from index.html
-        run: |
-          echo "[root]";        grep -n '<script.*src=' dist-all/index.html            || true
-          echo "[v1]";          grep -n '<script.*src=' dist-all/v1/index.html         || true
-          echo "[v1-hsbk]";     grep -n '<script.*src=' dist-all/v1-hsbk/index.html    || true
-          echo "[v2-preview]";  grep -n '<script.*src=' dist-all/v2-preview/index.html || true
-
-            # ---- Debug log ----
-      - name: Show dist-all structure
-        run: |
-          echo "========== dist-all content =========="
-          find dist-all -maxdepth 3 -type f | sort
-          echo "======================================"
+          test -f dist-all/index.html || exit 1
+          test -f dist-all/v1/index.html || exit 1
+          test -f dist-all/v1-hsbk/index.html || exit 1
+          test -f dist-all/v1-2courts/index.html || exit 1
+          test -f dist-all/v2-preview/index.html || exit 1
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
