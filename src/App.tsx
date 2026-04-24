@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 // ============================================================================
 const STORAGE_KEY = "tdoubles_state_v1";
 const PREF_KEY = "tdoubles_prefs_v1"; // 表示系プリファレンス（屋外モードなど）
-const APP_VERSION = "v1.3.0";
+const APP_VERSION = "v1.4.0 (2面・同時2試合)";
 
 // 初期登録メンバー
 const INITIAL_PARTICIPANTS = [
